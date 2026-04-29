@@ -17,52 +17,57 @@ URL="$1"
 # Extract username and playlist name from URL
 if [[ "$URL" == *"/sets/"* ]]; then
     USERNAME=$(echo "$URL" | sed -n 's|https://soundcloud.com/\([^/]*\)/sets/.*|\1|p')
-    PLAYLIST_NAME=$(echo "$URL" | sed -n 's|.*/sets/\([^/?]*\).*|\1|p')
+    PLAYLIST_NAME_RAW=$(echo "$URL" | sed -n 's|.*/sets/\([^/?]*\).*|\1|p')
 elif [[ "$URL" == *"/playlists/"* ]]; then
     USERNAME=$(echo "$URL" | sed -n 's|https://soundcloud.com/\([^/]*\)/playlists/.*|\1|p')
-    PLAYLIST_NAME=$(echo "$URL" | sed -n 's|.*/playlists/\([^/?]*\).*|\1|p')
+    PLAYLIST_NAME_RAW=$(echo "$URL" | sed -n 's|.*/playlists/\([^/?]*\).*|\1|p')
 else
     echo "Error: Could not extract playlist info from URL"
     exit 1
 fi
 
-if [ -z "$USERNAME" ] || [ -z "$PLAYLIST_NAME" ]; then
+if [ -z "$USERNAME" ] || [ -z "$PLAYLIST_NAME_RAW" ]; then
     echo "Error: Could not extract username or playlist name from URL"
     exit 1
 fi
 
-# Clean username and playlist name (remove invalid characters for filename)
+# Clean username (remove invalid chars)
 USERNAME=$(echo "$USERNAME" | sed 's/[\/\\:*?"<>|]/_/g' | sed 's/[[:space:]]/_/g' | sed 's/__*/_/g' | sed 's/^_//;s/_$//')
+
+# Check if playlist name contains Persian characters
+if echo "$PLAYLIST_NAME_RAW" | grep -qP '[\x{0600}-\x{06FF}]'; then
+    PLAYLIST_NAME="Playlist"
+else
+    PLAYLIST_NAME=$(echo "$PLAYLIST_NAME_RAW" | sed 's/^./\U&/')
+fi
+
+# Remove invalid characters from playlist name
 PLAYLIST_NAME=$(echo "$PLAYLIST_NAME" | sed 's/[\/\\:*?"<>|]/_/g' | sed 's/[[:space:]]/_/g' | sed 's/__*/_/g' | sed 's/^_//;s/_$//')
 
-# Convert first letter to uppercase
-USERNAME=$(echo "$USERNAME" | sed 's/^./\U&/')
-PLAYLIST_NAME=$(echo "$PLAYLIST_NAME" | sed 's/^./\U&/')
-
-echo "Cleaned Username: $USERNAME"
-echo "Cleaned Playlist Name: $PLAYLIST_NAME"
+echo "Playlist: $PLAYLIST_NAME"
+echo "Username: $USERNAME"
 
 # Create download directory
 mkdir -p "$DOWNLOAD_PATH"
 cd "$DOWNLOAD_PATH"
 
-# Find unique ZIP filename (add number if exists)
-BASE_ZIP_NAME="${USERNAME} - ${PLAYLIST_NAME}.zip"
+# Find unique ZIP filename
+BASE_ZIP_NAME="${PLAYLIST_NAME}.zip"
 FINAL_ZIP_NAME="$BASE_ZIP_NAME"
 COUNTER=1
 while [ -f "$FINAL_ZIP_NAME" ]; do
-    FINAL_ZIP_NAME="${USERNAME} - ${PLAYLIST_NAME}(${COUNTER}).zip"
+    FINAL_ZIP_NAME="${PLAYLIST_NAME}(${COUNTER}).zip"
     COUNTER=$((COUNTER + 1))
 done
 
 echo "ZIP file will be: $FINAL_ZIP_NAME"
 
 # Create temporary directory for playlist
-TEMP_DIR="${PLAYLIST_NAME}_temp"
+TEMP_DIR="temp_${PLAYLIST_NAME}"
 mkdir -p "$TEMP_DIR"
 cd "$TEMP_DIR"
 
-# Download all tracks (without track numbers)
+# Download all tracks
 echo "Downloading playlist tracks..."
 python3 -m yt_dlp --extract-audio --audio-format "$AUDIO_FORMAT" \
   --embed-thumbnail --convert-thumbnails jpg \
