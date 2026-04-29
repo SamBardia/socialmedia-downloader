@@ -8,6 +8,8 @@ on:
 jobs:
   detect-and-dispatch:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -24,8 +26,9 @@ jobs:
         run: |
           MSG="${{ steps.message.outputs.msg }}"
           echo "$MSG" | grep -oP 'sc:\s*https?://[^\s]+' > sc_urls.txt
+          echo "Found $(wc -l < sc_urls.txt) SoundCloud link(s)"
 
-      - name: Setup dependencies (shared cache)
+      - name: Setup dependencies
         run: |
           sudo apt-get update
           sudo apt-get install -y ffmpeg zip jq
@@ -33,18 +36,40 @@ jobs:
 
       - name: Process SoundCloud links
         run: |
+          chmod +x scripts/soundcloud/single.sh 2>/dev/null || true
+          chmod +x scripts/soundcloud/album.sh 2>/dev/null || true
+          chmod +x scripts/soundcloud/playlist.sh 2>/dev/null || true
+          
           while IFS= read -r line; do
             URL=$(echo "$line" | sed 's/^sc:\s*//')
-            echo "Processing SoundCloud: $URL"
+            echo ""
+            echo "========================================="
+            echo "Processing: $URL"
+            echo "========================================="
+            
+            # Detect content type
             if [[ "$URL" == *"/sets/"* ]]; then
-              echo "Type: album"
-              chmod +x scripts/soundcloud/album.sh
-              ./scripts/soundcloud/album.sh "$URL"
+              # Check if it's a playlist (has username before /sets/) or album (direct /sets/NAME)
+              # Album: soundcloud.com/sets/NAME or soundcloud.com/artist/sets/NAME where artist is the same as album artist
+              # Playlist: soundcloud.com/username/sets/NAME where username is NOT the artist
+              # For now, treat all /sets/ as albums (since SoundCloud calls them "sets")
+              # Playlists are usually under /playlists/ not /sets/
+              if [[ "$URL" == *"/playlists/"* ]]; then
+                echo "Type: Playlist"
+                ./scripts/soundcloud/playlist.sh "$URL"
+              else
+                echo "Type: Album"
+                ./scripts/soundcloud/album.sh "$URL"
+              fi
+            elif [[ "$URL" == *"/playlists/"* ]]; then
+              echo "Type: Playlist"
+              ./scripts/soundcloud/playlist.sh "$URL"
             else
-              echo "Type: single"
-              chmod +x scripts/soundcloud/single.sh
+              echo "Type: Single Track"
               ./scripts/soundcloud/single.sh "$URL"
             fi
+            
+            echo "Completed: $URL"
           done < sc_urls.txt
 
       - name: Push to repository
@@ -52,10 +77,23 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add downloads/soundcloud/
-          git commit -m "Add SoundCloud content [skip ci]" || echo "No changes"
+          git commit -m "Add SoundCloud content [skip ci]" || echo "No changes to commit"
           git push
 
       - name: List files
         run: |
+          echo ""
+          echo "========================================="
           echo "Files in downloads/soundcloud/:"
+          echo "========================================="
           ls -la downloads/soundcloud/
+          if [ -d "downloads/soundcloud" ] && [ "$(ls -A downloads/soundcloud)" ]; then
+            for file in downloads/soundcloud/*; do
+              if [ -f "$file" ]; then
+                echo ""
+                echo "📄 $(basename "$file")"
+              fi
+            done
+          else
+            echo "No files found in downloads/soundcloud/"
+          fi
