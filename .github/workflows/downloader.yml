@@ -19,46 +19,43 @@ jobs:
           git log -1 --pretty=%B >> $GITHUB_OUTPUT
           echo "EOF" >> $GITHUB_OUTPUT
 
-      - name: Extract links
+      - name: Extract SoundCloud links
         id: extract
         run: |
           MSG="${{ steps.message.outputs.msg }}"
-          echo "$MSG" | grep -oP 'sc:\s*https?://[^\s]+' > sc.txt
-          echo "$MSG" | grep -oP 'ig:\s*https?://[^\s]+' > ig.txt
-          echo "$MSG" | grep -oP 'tt:\s*https?://[^\s]+' > tt.txt
-          echo "$MSG" | grep -oP 'tw:\s*https?://[^\s]+' > tw.txt
+          echo "$MSG" | grep -oP 'sc:\s*https?://[^\s]+' > sc_urls.txt
 
-      - name: Setup cache and deps (shared)
-        uses: ./.github/actions/setup-deps
+      - name: Setup dependencies (shared cache)
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ffmpeg zip jq
+          pip install yt-dlp
 
-      - name: Dispatch to SoundCloud
+      - name: Process SoundCloud links
         run: |
           while IFS= read -r line; do
             URL=$(echo "$line" | sed 's/^sc:\s*//')
+            echo "Processing SoundCloud: $URL"
             if [[ "$URL" == *"/sets/"* ]]; then
-              gh workflow run platforms/soundcloud.yml -f url="$URL" -f type=album
+              echo "Type: album"
+              chmod +x scripts/soundcloud/album.sh
+              ./scripts/soundcloud/album.sh "$URL"
             else
-              gh workflow run platforms/soundcloud.yml -f url="$URL" -f type=single
+              echo "Type: single"
+              chmod +x scripts/soundcloud/single.sh
+              ./scripts/soundcloud/single.sh "$URL"
             fi
-          done < sc.txt
+          done < sc_urls.txt
 
-      - name: Dispatch to Instagram
+      - name: Push to repository
         run: |
-          while IFS= read -r line; do
-            URL=$(echo "$line" | sed 's/^ig:\s*//')
-            gh workflow run platforms/instagram.yml -f url="$URL"
-          done < ig.txt
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add downloads/soundcloud/
+          git commit -m "Add SoundCloud content [skip ci]" || echo "No changes"
+          git push
 
-      - name: Dispatch to TikTok
+      - name: List files
         run: |
-          while IFS= read -r line; do
-            URL=$(echo "$line" | sed 's/^tt:\s*//')
-            gh workflow run platforms/tiktok.yml -f url="$URL"
-          done < tt.txt
-
-      - name: Dispatch to Twitter
-        run: |
-          while IFS= read -r line; do
-            URL=$(echo "$line" | sed 's/^tw:\s*//')
-            gh workflow run platforms/twitter.yml -f url="$URL"
-          done < tw.txt
+          echo "Files in downloads/soundcloud/:"
+          ls -la downloads/soundcloud/
