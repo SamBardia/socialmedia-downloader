@@ -15,11 +15,18 @@ SPLIT_LARGE_FILES="${SPLIT_LARGE_FILES:-true}"
 URL="$1"
 
 # Extract album name from URL (everything after /sets/)
-ALBUM_NAME=$(echo "$URL" | sed -n 's|.*/sets/\([^/?]*\).*|\1|p' | sed 's/^./\U&/')
+ALBUM_NAME_RAW=$(echo "$URL" | sed -n 's|.*/sets/\([^/?]*\).*|\1|p')
 
-if [ -z "$ALBUM_NAME" ]; then
+if [ -z "$ALBUM_NAME_RAW" ]; then
     echo "Error: Could not extract album name from URL"
     exit 1
+fi
+
+# Check if album name contains Persian characters
+if echo "$ALBUM_NAME_RAW" | grep -qP '[\x{0600}-\x{06FF}]'; then
+    ALBUM_NAME="Album"
+else
+    ALBUM_NAME=$(echo "$ALBUM_NAME_RAW" | sed 's/^./\U&/')
 fi
 
 # Remove invalid characters from album name
@@ -43,7 +50,7 @@ done
 echo "ZIP file will be: $FINAL_ZIP_NAME"
 
 # Create temporary directory for album
-TEMP_DIR="${ALBUM_NAME}_temp"
+TEMP_DIR="temp_${ALBUM_NAME}"
 mkdir -p "$TEMP_DIR"
 cd "$TEMP_DIR"
 
@@ -55,7 +62,7 @@ python3 -m yt_dlp --skip-download --write-thumbnail --convert-thumbnails jpg \
   --output "${ALBUM_NAME} - Pic" \
   "$URL" 2>/dev/null
 
-# Download all tracks as numbered files with clean artist and track names
+# Download all tracks
 echo "Downloading tracks..."
 python3 -m yt_dlp --extract-audio --audio-format "$AUDIO_FORMAT" \
   --embed-thumbnail --convert-thumbnails jpg \
@@ -73,7 +80,7 @@ if [ $? -ne 0 ]; then
     exit 1
 fi
 
-# Clean up filenames inside temp directory (remove invalid chars from downloaded files)
+# Clean up filenames inside temp directory
 for file in *; do
     if [ -f "$file" ]; then
         clean_name=$(echo "$file" | sed 's/[\/\\:*?"<>|]/_/g' | sed 's/[[:space:]]/_/g' | sed 's/__*/_/g')
