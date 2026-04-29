@@ -54,9 +54,15 @@ while [ -f "$FINAL_FILENAME" ]; do
     COUNTER=$((COUNTER + 1))
 done
 
-# Download with cover art
+# Download with cover art and retry logic
 python3 -m yt_dlp --extract-audio --audio-format "$AUDIO_FORMAT" \
   --embed-thumbnail --convert-thumbnails jpg \
+  --retries 10 \
+  --fragment-retries 10 \
+  --retry-sleep exp=1:60 \
+  --sleep-interval 3 \
+  --max-sleep-interval 10 \
+  --limit-rate 500K \
   --output "$FINAL_FILENAME" \
   "$URL"
 
