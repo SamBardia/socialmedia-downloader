@@ -19,10 +19,21 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ffmpeg zip
+          pip install yt-dlp
+
       - name: Run script
         run: |
-          chmod +x scripts/soundcloud/${{ inputs.type }}.sh
-          ./scripts/soundcloud/${{ inputs.type }}.sh "${{ inputs.url }}"
+          if [[ "${{ inputs.type }}" == "single" ]]; then
+            chmod +x scripts/soundcloud/single.sh
+            ./scripts/soundcloud/single.sh "${{ inputs.url }}"
+          else
+            chmod +x scripts/soundcloud/album.sh
+            ./scripts/soundcloud/album.sh "${{ inputs.url }}"
+          fi
 
       - name: Push changes
         run: |
