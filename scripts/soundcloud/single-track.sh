@@ -5,7 +5,7 @@ if [ -f "config/soundcloud.conf" ]; then
     source "config/soundcloud.conf"
 fi
 
-# Set defaults if config values are missing
+# Set defaults
 AUDIO_FORMAT="${AUDIO_FORMAT:-mp3}"
 DOWNLOAD_PATH="${DOWNLOAD_PATH:-downloads/soundcloud}"
 
