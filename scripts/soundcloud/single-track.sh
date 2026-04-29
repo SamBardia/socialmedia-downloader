@@ -14,7 +14,7 @@ cd "$DOWNLOAD_PATH"
 
 # Download single track as MP3
 yt-dlp --extract-audio --audio-format "$AUDIO_FORMAT" \
-  --output "%(uploader)s - %(title)s.%(ext)s" \
+  --output "%(artist)s - %(title)s.%(ext)s" \
   "$URL"
 
 echo "Single track download completed"
