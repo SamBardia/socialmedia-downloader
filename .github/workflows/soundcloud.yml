@@ -46,11 +46,18 @@ jobs:
           chmod +x scripts/soundcloud/single-track.sh
           ./scripts/soundcloud/single-track.sh "${{ steps.find.outputs.url }}"
 
+      - name: List files before push
+        if: steps.find.outputs.found == 'true'
+        run: |
+          echo "Files in downloads/soundcloud:"
+          ls -la downloads/soundcloud/ || echo "Directory not found or empty"
+
       - name: Push to repository
         if: steps.find.outputs.found == 'true'
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add downloads/soundcloud/
-          git commit -m "Add SoundCloud track [skip ci]" || echo "No changes"
+          git status
+          git commit -m "Add SoundCloud track [skip ci]" || echo "No changes to commit"
           git push
