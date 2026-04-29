@@ -38,9 +38,6 @@ if [ -z "$TITLE" ]; then
 fi
 
 # Clean title from artist prefix if present
-# Remove feat. part from title to avoid duplication
-TITLE=$(echo "$TITLE" | sed 's/\s*\[.*\]//g' | sed 's/\s*(feat\..*)//g' | sed 's/\s*ft\..*//g' | sed 's/\s*featuring.*//g')
-
 if [[ "$TITLE" == "$ARTIST - "* ]]; then
     TITLE="${TITLE#$ARTIST - }"
 fi
