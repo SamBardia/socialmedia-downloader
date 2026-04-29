@@ -18,9 +18,9 @@ mkdir -p "$DOWNLOAD_PATH"
 # Change to download directory
 cd "$DOWNLOAD_PATH"
 
-# Download using python module (avoids PATH issues)
+# Download using python module
 python3 -m yt_dlp --extract-audio --audio-format "$AUDIO_FORMAT" \
-  --output "%(artist)s - %(title)s.%(ext)s" \
+  --output "%(artist)s - %(track)s.%(ext)s" \
   "$URL"
 
 # Check if download was successful
