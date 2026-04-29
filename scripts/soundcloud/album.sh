@@ -28,13 +28,22 @@ echo "Album: $ALBUM_NAME"
 mkdir -p "$DOWNLOAD_PATH"
 cd "$DOWNLOAD_PATH"
 
-# Create temporary directory for album
-TEMP_DIR="${ALBUM_NAME}_temp"
+# Find unique ZIP filename (add number if exists)
+BASE_ZIP_NAME="${ALBUM_NAME}.zip"
+FINAL_ZIP_NAME="$BASE_ZIP_NAME"
+COUNTER=1
+while [ -f "$FINAL_ZIP_NAME" ]; do
+    FINAL_ZIP_NAME="${ALBUM_NAME}(${COUNTER}).zip"
+    COUNTER=$((COUNTER + 1))
+done
+
+# Create temporary directory for album (with " Album" suffix)
+TEMP_DIR="${ALBUM_NAME} Album"
 mkdir -p "$TEMP_DIR"
 cd "$TEMP_DIR"
 
-# Download album cover separately
-echo "Downloading album cover..."
+# Download best quality album cover
+echo "Downloading album cover (best quality)..."
 python3 -m yt_dlp --skip-download --write-thumbnail --convert-thumbnails jpg \
   --output "${ALBUM_NAME} - Pic" \
   "$URL" 2>/dev/null
@@ -52,7 +61,7 @@ if [ $? -ne 0 ]; then
     exit 1
 fi
 
-# Remove any leftover temp files
+# Remove any leftover temp files (low quality thumbnails)
 rm -f *.webp 2>/dev/null
 rm -f *.jpg.* 2>/dev/null
 
@@ -63,16 +72,17 @@ cd ..
 TOTAL_SIZE=$(du -sb "$TEMP_DIR" | cut -f1)
 MAX_SIZE_BYTES=$((MAX_ZIP_SIZE_MB * 1024 * 1024))
 
-echo "Creating ZIP archive..."
+echo "Creating ZIP archive: $FINAL_ZIP_NAME"
 
 if [ "$SPLIT_LARGE_FILES" = "true" ] && [ "$TOTAL_SIZE" -gt "$MAX_SIZE_BYTES" ]; then
     echo "Total size exceeds ${MAX_ZIP_SIZE_MB}MB, splitting ZIP into parts"
-    zip -s "${MAX_ZIP_SIZE_MB}m" -r "${ALBUM_NAME}.zip" "$TEMP_DIR"
+    zip -s "${MAX_ZIP_SIZE_MB}m" -r "$FINAL_ZIP_NAME" "$TEMP_DIR"
 else
-    zip -r "${ALBUM_NAME}.zip" "$TEMP_DIR"
+    zip -r "$FINAL_ZIP_NAME" "$TEMP_DIR"
 fi
 
 # Clean up
 rm -rf "$TEMP_DIR"
 
-echo "✅ Album download completed: ${ALBUM_NAME}.zip"
+echo "✅ Album download completed: $FINAL_ZIP_NAME"
+ls -la "${FINAL_ZIP_NAME}"*
