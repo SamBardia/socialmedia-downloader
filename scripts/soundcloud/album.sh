@@ -22,6 +22,9 @@ if [ -z "$ALBUM_NAME" ]; then
     exit 1
 fi
 
+# Remove invalid characters from album name
+ALBUM_NAME=$(echo "$ALBUM_NAME" | sed 's/[\/\\:*?"<>|]/_/g' | sed 's/[[:space:]]/_/g' | sed 's/__*/_/g' | sed 's/^_//;s/_$//')
+
 echo "Album: $ALBUM_NAME"
 
 # Create download directory
@@ -37,18 +40,22 @@ while [ -f "$FINAL_ZIP_NAME" ]; do
     COUNTER=$((COUNTER + 1))
 done
 
-# Create temporary directory for album (with " Album" suffix)
-TEMP_DIR="${ALBUM_NAME} Album"
+echo "ZIP file will be: $FINAL_ZIP_NAME"
+
+# Create temporary directory for album
+TEMP_DIR="${ALBUM_NAME}_temp"
 mkdir -p "$TEMP_DIR"
 cd "$TEMP_DIR"
 
 # Download best quality album cover
 echo "Downloading album cover (best quality)..."
 python3 -m yt_dlp --skip-download --write-thumbnail --convert-thumbnails jpg \
+  --retries 10 \
+  --retry-sleep exp=1:60 \
   --output "${ALBUM_NAME} - Pic" \
   "$URL" 2>/dev/null
 
-# Download all tracks with retry logic
+# Download all tracks as numbered files with clean artist and track names
 echo "Downloading tracks..."
 python3 -m yt_dlp --extract-audio --audio-format "$AUDIO_FORMAT" \
   --embed-thumbnail --convert-thumbnails jpg \
@@ -61,13 +68,22 @@ python3 -m yt_dlp --extract-audio --audio-format "$AUDIO_FORMAT" \
   --output "%(playlist_index)02d - %(artist)s - %(track)s.%(ext)s" \
   "$URL"
 
-# Check if download was successful
 if [ $? -ne 0 ]; then
     echo "Download failed"
     exit 1
 fi
 
-# Remove any leftover temp files (low quality thumbnails)
+# Clean up filenames inside temp directory (remove invalid chars from downloaded files)
+for file in *; do
+    if [ -f "$file" ]; then
+        clean_name=$(echo "$file" | sed 's/[\/\\:*?"<>|]/_/g' | sed 's/[[:space:]]/_/g' | sed 's/__*/_/g')
+        if [ "$file" != "$clean_name" ]; then
+            mv "$file" "$clean_name" 2>/dev/null || true
+        fi
+    fi
+done
+
+# Remove any leftover temp files
 rm -f *.webp 2>/dev/null
 rm -f *.jpg.* 2>/dev/null
 
@@ -75,20 +91,25 @@ rm -f *.jpg.* 2>/dev/null
 cd ..
 
 # Create ZIP archive
-TOTAL_SIZE=$(du -sb "$TEMP_DIR" | cut -f1)
-MAX_SIZE_BYTES=$((MAX_ZIP_SIZE_MB * 1024 * 1024))
+if [ -d "$TEMP_DIR" ] && [ "$(ls -A $TEMP_DIR)" ]; then
+    TOTAL_SIZE=$(du -sb "$TEMP_DIR" | cut -f1)
+    MAX_SIZE_BYTES=$((MAX_ZIP_SIZE_MB * 1024 * 1024))
 
-echo "Creating ZIP archive: $FINAL_ZIP_NAME"
+    echo "Creating ZIP archive: $FINAL_ZIP_NAME"
 
-if [ "$SPLIT_LARGE_FILES" = "true" ] && [ "$TOTAL_SIZE" -gt "$MAX_SIZE_BYTES" ]; then
-    echo "Total size exceeds ${MAX_ZIP_SIZE_MB}MB, splitting ZIP into parts"
-    zip -s "${MAX_ZIP_SIZE_MB}m" -r "$FINAL_ZIP_NAME" "$TEMP_DIR"
+    if [ "$SPLIT_LARGE_FILES" = "true" ] && [ "$TOTAL_SIZE" -gt "$MAX_SIZE_BYTES" ]; then
+        echo "Total size exceeds ${MAX_ZIP_SIZE_MB}MB, splitting ZIP into parts"
+        zip -s "${MAX_ZIP_SIZE_MB}m" -r "$FINAL_ZIP_NAME" "$TEMP_DIR"
+    else
+        zip -r "$FINAL_ZIP_NAME" "$TEMP_DIR"
+    fi
+    
+    rm -rf "$TEMP_DIR"
+    
+    echo "✅ Album download completed: $FINAL_ZIP_NAME"
+    ls -la "${FINAL_ZIP_NAME}"*
 else
-    zip -r "$FINAL_ZIP_NAME" "$TEMP_DIR"
+    echo "No files downloaded for album"
+    rm -rf "$TEMP_DIR"
+    exit 1
 fi
-
-# Clean up
-rm -rf "$TEMP_DIR"
-
-echo "✅ Album download completed: $FINAL_ZIP_NAME"
-ls -la "${FINAL_ZIP_NAME}"*
