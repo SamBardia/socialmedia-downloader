@@ -27,10 +27,15 @@ if [ -z "$ARTIST" ]; then
     ARTIST=$(echo "$METADATA" | grep -oP '"uploader":\s*"\K[^"]+' | head -1)
 fi
 
-# Clean artist: replace commas (including unicode \uff0c) with &
+# Clean artist: replace commas with &
 ARTIST=$(echo "$ARTIST" | sed 's/\\uff0c/,/g' | sed 's/،/,/g')
 ARTIST=$(echo "$ARTIST" | sed 's/[[:space:]]*,[[:space:]]*/ \& /g')
 ARTIST=$(echo "$ARTIST" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')
+
+# Check if artist contains Persian characters
+if echo "$ARTIST" | grep -qP '[\x{0600}-\x{06FF}]'; then
+    ARTIST="Artist"
+fi
 
 # Remove invalid characters from artist name
 ARTIST=$(echo "$ARTIST" | sed 's/[\/\\:*?"<>|]/_/g' | sed 's/[[:space:]]/_/g' | sed 's/__*/_/g' | sed 's/^_//;s/_$//')
@@ -38,6 +43,11 @@ ARTIST=$(echo "$ARTIST" | sed 's/[\/\\:*?"<>|]/_/g' | sed 's/[[:space:]]/_/g' | 
 TITLE=$(echo "$METADATA" | grep -oP '"track":\s*"\K[^"]+' | head -1)
 if [ -z "$TITLE" ]; then
     TITLE=$(echo "$METADATA" | grep -oP '"title":\s*"\K[^"]+' | head -1)
+fi
+
+# Check if title contains Persian characters
+if echo "$TITLE" | grep -qP '[\x{0600}-\x{06FF}]'; then
+    TITLE="Track"
 fi
 
 # Remove invalid characters from title
