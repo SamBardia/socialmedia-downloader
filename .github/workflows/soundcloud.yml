@@ -33,26 +33,12 @@ jobs:
             echo "found=false" >> $GITHUB_OUTPUT
           fi
 
-      - name: Cache pip packages
-        if: steps.find.outputs.found == 'true'
-        id: cache-pip
-        uses: actions/cache@v3
-        with:
-          path: ~/.cache/pip
-          key: ${{ runner.os }}-pip-soundcloud-${{ hashFiles('requirements/soundcloud.txt') }}
-
       - name: Install dependencies
-        if: steps.find.outputs.found == 'true' && steps.cache-pip.outputs.cache-hit != 'true'
+        if: steps.find.outputs.found == 'true'
         run: |
           sudo apt-get update
           sudo apt-get install -y ffmpeg
-          pip install -r requirements/soundcloud.txt
-
-      - name: Ensure yt-dlp is in PATH
-        if: steps.find.outputs.found == 'true'
-        run: |
-          echo "$HOME/.local/bin" >> $GITHUB_PATH
-          export PATH="$HOME/.local/bin:$PATH"
+          pip install yt-dlp
 
       - name: Run download script
         if: steps.find.outputs.found == 'true'
