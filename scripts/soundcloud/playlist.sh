@@ -15,7 +15,6 @@ SPLIT_LARGE_FILES="${SPLIT_LARGE_FILES:-true}"
 URL="$1"
 
 # Extract username and playlist name from URL
-# Format: https://soundcloud.com/USERNAME/sets/PLAYLIST_NAME or /playlists/PLAYLIST_NAME
 if [[ "$URL" == *"/sets/"* ]]; then
     USERNAME=$(echo "$URL" | sed -n 's|https://soundcloud.com/\([^/]*\)/sets/.*|\1|p')
     PLAYLIST_NAME=$(echo "$URL" | sed -n 's|.*/sets/\([^/?]*\).*|\1|p')
@@ -32,11 +31,16 @@ if [ -z "$USERNAME" ] || [ -z "$PLAYLIST_NAME" ]; then
     exit 1
 fi
 
-# Convert first letter of playlist name to uppercase
-PLAYLIST_NAME=$(echo "$PLAYLIST_NAME" | sed 's/^./\U&/')
-USERNAME=$(echo "$USERNAME" | sed 's/^./\U&/')
+# Clean username and playlist name (remove invalid characters for filename)
+USERNAME=$(echo "$USERNAME" | sed 's/[\/\\:*?"<>|]/_/g' | sed 's/[[:space:]]/_/g' | sed 's/__*/_/g' | sed 's/^_//;s/_$//')
+PLAYLIST_NAME=$(echo "$PLAYLIST_NAME" | sed 's/[\/\\:*?"<>|]/_/g' | sed 's/[[:space:]]/_/g' | sed 's/__*/_/g' | sed 's/^_//;s/_$//')
 
-echo "Playlist: $PLAYLIST_NAME by $USERNAME"
+# Convert first letter to uppercase
+USERNAME=$(echo "$USERNAME" | sed 's/^./\U&/')
+PLAYLIST_NAME=$(echo "$PLAYLIST_NAME" | sed 's/^./\U&/')
+
+echo "Cleaned Username: $USERNAME"
+echo "Cleaned Playlist Name: $PLAYLIST_NAME"
 
 # Create download directory
 mkdir -p "$DOWNLOAD_PATH"
@@ -50,6 +54,8 @@ while [ -f "$FINAL_ZIP_NAME" ]; do
     FINAL_ZIP_NAME="${USERNAME} - ${PLAYLIST_NAME}(${COUNTER}).zip"
     COUNTER=$((COUNTER + 1))
 done
+
+echo "ZIP file will be: $FINAL_ZIP_NAME"
 
 # Create temporary directory for playlist
 TEMP_DIR="${PLAYLIST_NAME}_temp"
@@ -74,6 +80,16 @@ if [ $? -ne 0 ]; then
     exit 1
 fi
 
+# Clean up filenames inside temp directory
+for file in *; do
+    if [ -f "$file" ]; then
+        clean_name=$(echo "$file" | sed 's/[\/\\:*?"<>|]/_/g' | sed 's/[[:space:]]/_/g' | sed 's/__*/_/g')
+        if [ "$file" != "$clean_name" ]; then
+            mv "$file" "$clean_name" 2>/dev/null || true
+        fi
+    fi
+done
+
 # Remove any leftover temp files
 rm -f *.webp 2>/dev/null
 rm -f *.jpg.* 2>/dev/null
@@ -82,20 +98,25 @@ rm -f *.jpg.* 2>/dev/null
 cd ..
 
 # Create ZIP archive
-TOTAL_SIZE=$(du -sb "$TEMP_DIR" | cut -f1)
-MAX_SIZE_BYTES=$((MAX_ZIP_SIZE_MB * 1024 * 1024))
+if [ -d "$TEMP_DIR" ] && [ "$(ls -A $TEMP_DIR)" ]; then
+    TOTAL_SIZE=$(du -sb "$TEMP_DIR" | cut -f1)
+    MAX_SIZE_BYTES=$((MAX_ZIP_SIZE_MB * 1024 * 1024))
 
-echo "Creating ZIP archive: $FINAL_ZIP_NAME"
+    echo "Creating ZIP archive: $FINAL_ZIP_NAME"
 
-if [ "$SPLIT_LARGE_FILES" = "true" ] && [ "$TOTAL_SIZE" -gt "$MAX_SIZE_BYTES" ]; then
-    echo "Total size exceeds ${MAX_ZIP_SIZE_MB}MB, splitting ZIP into parts"
-    zip -s "${MAX_ZIP_SIZE_MB}m" -r "$FINAL_ZIP_NAME" "$TEMP_DIR"
+    if [ "$SPLIT_LARGE_FILES" = "true" ] && [ "$TOTAL_SIZE" -gt "$MAX_SIZE_BYTES" ]; then
+        echo "Total size exceeds ${MAX_ZIP_SIZE_MB}MB, splitting ZIP into parts"
+        zip -s "${MAX_ZIP_SIZE_MB}m" -r "$FINAL_ZIP_NAME" "$TEMP_DIR"
+    else
+        zip -r "$FINAL_ZIP_NAME" "$TEMP_DIR"
+    fi
+    
+    rm -rf "$TEMP_DIR"
+    
+    echo "✅ Playlist download completed: $FINAL_ZIP_NAME"
+    ls -la "${FINAL_ZIP_NAME}"*
 else
-    zip -r "$FINAL_ZIP_NAME" "$TEMP_DIR"
+    echo "No files downloaded for playlist"
+    rm -rf "$TEMP_DIR"
+    exit 1
 fi
-
-# Clean up
-rm -rf "$TEMP_DIR"
-
-echo "✅ Playlist download completed: $FINAL_ZIP_NAME"
-ls -la "${FINAL_ZIP_NAME}"*
