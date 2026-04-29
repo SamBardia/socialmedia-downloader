@@ -49,8 +49,9 @@ while [ -f "$FINAL_FILENAME" ]; do
     COUNTER=$((COUNTER + 1))
 done
 
-# Download with custom filename
+# Download with cover art
 python3 -m yt_dlp --extract-audio --audio-format "$AUDIO_FORMAT" \
+  --embed-thumbnail --convert-thumbnails jpg \
   --output "$FINAL_FILENAME" \
   "$URL"
 
