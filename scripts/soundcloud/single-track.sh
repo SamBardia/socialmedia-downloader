@@ -27,12 +27,20 @@ if [ -z "$ARTIST" ]; then
     ARTIST=$(echo "$METADATA" | grep -oP '"uploader":\s*"\K[^"]+' | head -1)
 fi
 
+# Clean artist: replace commas (including unicode \uff0c) with &
+ARTIST=$(echo "$ARTIST" | sed 's/\\uff0c/,/g' | sed 's/،/,/g')
+ARTIST=$(echo "$ARTIST" | sed 's/[[:space:]]*,[[:space:]]*/ \& /g')
+ARTIST=$(echo "$ARTIST" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')
+
 TITLE=$(echo "$METADATA" | grep -oP '"track":\s*"\K[^"]+' | head -1)
 if [ -z "$TITLE" ]; then
     TITLE=$(echo "$METADATA" | grep -oP '"title":\s*"\K[^"]+' | head -1)
 fi
 
 # Clean title from artist prefix if present
+# Remove feat. part from title to avoid duplication
+TITLE=$(echo "$TITLE" | sed 's/\s*\[.*\]//g' | sed 's/\s*(feat\..*)//g' | sed 's/\s*ft\..*//g' | sed 's/\s*featuring.*//g')
+
 if [[ "$TITLE" == "$ARTIST - "* ]]; then
     TITLE="${TITLE#$ARTIST - }"
 fi
