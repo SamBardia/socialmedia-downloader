@@ -48,10 +48,16 @@ python3 -m yt_dlp --skip-download --write-thumbnail --convert-thumbnails jpg \
   --output "${ALBUM_NAME} - Pic" \
   "$URL" 2>/dev/null
 
-# Download all tracks as numbered files (always 2-digit numbers)
+# Download all tracks with retry logic
 echo "Downloading tracks..."
 python3 -m yt_dlp --extract-audio --audio-format "$AUDIO_FORMAT" \
   --embed-thumbnail --convert-thumbnails jpg \
+  --retries 10 \
+  --fragment-retries 10 \
+  --retry-sleep exp=1:60 \
+  --sleep-interval 3 \
+  --max-sleep-interval 10 \
+  --limit-rate 500K \
   --output "%(playlist_index)02d - %(artist)s - %(track)s.%(ext)s" \
   "$URL"
 
