@@ -32,10 +32,16 @@ ARTIST=$(echo "$ARTIST" | sed 's/\\uff0c/,/g' | sed 's/،/,/g')
 ARTIST=$(echo "$ARTIST" | sed 's/[[:space:]]*,[[:space:]]*/ \& /g')
 ARTIST=$(echo "$ARTIST" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')
 
+# Remove invalid characters from artist name
+ARTIST=$(echo "$ARTIST" | sed 's/[\/\\:*?"<>|]/_/g' | sed 's/[[:space:]]/_/g' | sed 's/__*/_/g' | sed 's/^_//;s/_$//')
+
 TITLE=$(echo "$METADATA" | grep -oP '"track":\s*"\K[^"]+' | head -1)
 if [ -z "$TITLE" ]; then
     TITLE=$(echo "$METADATA" | grep -oP '"title":\s*"\K[^"]+' | head -1)
 fi
+
+# Remove invalid characters from title
+TITLE=$(echo "$TITLE" | sed 's/[\/\\:*?"<>|]/_/g' | sed 's/[[:space:]]/_/g' | sed 's/__*/_/g' | sed 's/^_//;s/_$//')
 
 # Clean title from artist prefix if present
 if [[ "$TITLE" == "$ARTIST - "* ]]; then
@@ -53,6 +59,8 @@ while [ -f "$FINAL_FILENAME" ]; do
     FINAL_FILENAME="${BASE_FILENAME}(${COUNTER}).${EXTENSION}"
     COUNTER=$((COUNTER + 1))
 done
+
+echo "Downloading: $FINAL_FILENAME"
 
 # Download with cover art and retry logic
 python3 -m yt_dlp --extract-audio --audio-format "$AUDIO_FORMAT" \
