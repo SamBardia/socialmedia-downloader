@@ -32,25 +32,30 @@ if [ -z "$TITLE" ]; then
     TITLE=$(echo "$METADATA" | grep -oP '"title":\s*"\K[^"]+' | head -1)
 fi
 
-# Clean artist and title from duplicates
-# If artist name appears at the beginning of title, remove it
+# Clean title from artist prefix if present
 if [[ "$TITLE" == "$ARTIST - "* ]]; then
     TITLE="${TITLE#$ARTIST - }"
 fi
 
-# Create final filename
-FILENAME="${ARTIST} - ${TITLE}.${AUDIO_FORMAT}"
+# Generate base filename
+BASE_FILENAME="${ARTIST} - ${TITLE}"
+EXTENSION="$AUDIO_FORMAT"
+
+# Find unique filename (add number if exists)
+FINAL_FILENAME="${BASE_FILENAME}.${EXTENSION}"
+COUNTER=1
+while [ -f "$FINAL_FILENAME" ]; do
+    FINAL_FILENAME="${BASE_FILENAME}(${COUNTER}).${EXTENSION}"
+    COUNTER=$((COUNTER + 1))
+done
 
 # Download with custom filename
 python3 -m yt_dlp --extract-audio --audio-format "$AUDIO_FORMAT" \
-  --output "$FILENAME" \
+  --output "$FINAL_FILENAME" \
   "$URL"
 
-# Check if download was successful
 if [ $? -eq 0 ]; then
-    echo "Single track download completed successfully: $FILENAME"
-    # Remove old duplicate files if they exist
-    rm -f "* - ${TITLE}.${AUDIO_FORMAT}" 2>/dev/null || true
+    echo "Single track download completed successfully: $FINAL_FILENAME"
 else
     echo "Download failed"
     exit 1
