@@ -1,0 +1,64 @@
+name: Universal Downloader
+
+on:
+  push:
+    branches: [ "main" ]
+  workflow_dispatch:
+
+jobs:
+  detect-and-dispatch:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Get commit message
+        id: message
+        run: |
+          echo "msg<<EOF" >> $GITHUB_OUTPUT
+          git log -1 --pretty=%B >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+
+      - name: Extract links
+        id: extract
+        run: |
+          MSG="${{ steps.message.outputs.msg }}"
+          echo "$MSG" | grep -oP 'sc:\s*https?://[^\s]+' > sc.txt
+          echo "$MSG" | grep -oP 'ig:\s*https?://[^\s]+' > ig.txt
+          echo "$MSG" | grep -oP 'tt:\s*https?://[^\s]+' > tt.txt
+          echo "$MSG" | grep -oP 'tw:\s*https?://[^\s]+' > tw.txt
+
+      - name: Setup cache and deps (shared)
+        uses: ./.github/actions/setup-deps
+
+      - name: Dispatch to SoundCloud
+        run: |
+          while IFS= read -r line; do
+            URL=$(echo "$line" | sed 's/^sc:\s*//')
+            if [[ "$URL" == *"/sets/"* ]]; then
+              gh workflow run platforms/soundcloud.yml -f url="$URL" -f type=album
+            else
+              gh workflow run platforms/soundcloud.yml -f url="$URL" -f type=single
+            fi
+          done < sc.txt
+
+      - name: Dispatch to Instagram
+        run: |
+          while IFS= read -r line; do
+            URL=$(echo "$line" | sed 's/^ig:\s*//')
+            gh workflow run platforms/instagram.yml -f url="$URL"
+          done < ig.txt
+
+      - name: Dispatch to TikTok
+        run: |
+          while IFS= read -r line; do
+            URL=$(echo "$line" | sed 's/^tt:\s*//')
+            gh workflow run platforms/tiktok.yml -f url="$URL"
+          done < tt.txt
+
+      - name: Dispatch to Twitter
+        run: |
+          while IFS= read -r line; do
+            URL=$(echo "$line" | sed 's/^tw:\s*//')
+            gh workflow run platforms/twitter.yml -f url="$URL"
+          done < tw.txt
