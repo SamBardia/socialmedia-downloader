@@ -110,10 +110,14 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
+          # First, try to pull with rebase, ignore if fails
           git pull origin main --rebase || true
-          git add downloads/youtube/
+          # Add all changes (including new directories)
+          git add downloads/
+          # Commit if there are changes
           git commit -m "Add YouTube content [skip ci]" || echo "No changes to commit"
-          git push
+          # Push with force lease to avoid conflicts
+          git push --force-with-lease || git push
 
       # ============================================
       # List downloaded files
