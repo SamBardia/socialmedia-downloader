@@ -1,0 +1,57 @@
+name: SoundCloud Downloader
+
+on:
+  workflow_dispatch:
+    inputs:
+      urls:
+        description: 'SoundCloud URLs (one per line)'
+        required: true
+        type: string
+
+jobs:
+  download:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ffmpeg zip jq
+          pip install yt-dlp
+
+      - name: Process URLs
+        run: |
+          chmod +x scripts/soundcloud/single.sh
+          chmod +x scripts/soundcloud/album.sh
+          chmod +x scripts/soundcloud/playlist.sh
+          
+          echo "${{ github.event.inputs.urls }}" | while read -r URL; do
+            [[ -z "$URL" ]] && continue
+            echo "Processing: $URL"
+            
+            if [[ "$URL" =~ ^https://soundcloud\.com/[^/]+/[^/]+$ ]] && [[ "$URL" != *"/sets/"* ]]; then
+              ./scripts/soundcloud/single.sh "$URL"
+            elif [[ "$URL" == *"/sets/"* ]]; then
+              INFO=$(python3 -m yt_dlp --skip-download --dump-json "$URL" 2>/dev/null)
+              TITLE=$(echo "$INFO" | jq -r '.playlist_title // empty')
+              if echo "$TITLE" | grep -qP '[\x{0600}-\x{06FF}]'; then
+                ./scripts/soundcloud/playlist.sh "$URL"
+              else
+                ./scripts/soundcloud/album.sh "$URL"
+              fi
+            else
+              ./scripts/soundcloud/single.sh "$URL"
+            fi
+          done
+
+      - name: Push to repository
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add downloads/soundcloud/
+          git commit -m "Add SoundCloud content [skip ci]" || echo "No changes"
+          git push
