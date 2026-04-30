@@ -32,28 +32,42 @@ jobs:
         run: |
           MSG="${{ steps.message.outputs.msg }}"
           
-          # Array of quality prefixes
-          PREFIXES=("yt-144" "yt-240" "yt-360" "yt-480" "yt-720" "yt-1080" "yt-best" "yt-audio")
+          # Initialize arrays
+          declare -A quality_urls
           
-          echo "urls_json=" >> $GITHUB_OUTPUT
-          echo "found=false" >> $GITHUB_OUTPUT
+          # Define quality patterns
+          patterns=(
+            "yt-144:"
+            "yt-240:"
+            "yt-360:"
+            "yt-480:"
+            "yt-720:"
+            "yt-1080:"
+            "yt-best:"
+            "yt-audio:"
+          )
           
-          for prefix in "${PREFIXES[@]}"; do
-            # Extract URLs for this quality
-            URLS=$(echo "$MSG" | grep -oP "${prefix}:\s*\Khttps?://[^\s]+" || true)
-            if [ -n "$URLS" ]; then
-              quality="${prefix#yt-}"
-              echo "Found ${prefix}: $URLS"
-              while IFS= read -r url; do
-                if [ -n "$url" ]; then
-                  echo "url_${quality}<<EOF" >> $GITHUB_OUTPUT
-                  echo "$url" >> $GITHUB_OUTPUT
-                  echo "EOF" >> $GITHUB_OUTPUT
-                  echo "found=true" >> $GITHUB_OUTPUT
-                fi
-              done <<< "$URLS"
+          for pattern in "${patterns[@]}"; do
+            quality="${pattern#yt-}"
+            quality="${quality%:}"
+            # Extract URLs for this pattern
+            urls=$(echo "$MSG" | grep -oP "${pattern}\s*\Khttps?://[^\s]+" || true)
+            if [ -n "$urls" ]; then
+              quality_urls["$quality"]="$urls"
+              echo "Found $pattern $urls"
             fi
           done
+          
+          # Save to output
+          for quality in "${!quality_urls[@]}"; do
+            echo "url_${quality}=${quality_urls[$quality]}" >> $GITHUB_OUTPUT
+          done
+          
+          if [ ${#quality_urls[@]} -gt 0 ]; then
+            echo "found=true" >> $GITHUB_OUTPUT
+          else
+            echo "found=false" >> $GITHUB_OUTPUT
+          fi
 
       # ============================================
       # Install dependencies
@@ -67,18 +81,19 @@ jobs:
           pip install brotlicffi
 
       # ============================================
-      # Process all YouTube URLs
+      # Process each YouTube URL
       # ============================================
-      - name: Process all YouTube URLs
+      - name: Process YouTube URLs
         if: steps.extract.outputs.found == 'true'
         run: |
           chmod +x scripts/youtube/single-video.sh
           
-          # Process each quality separately
+          # Process each quality level
           for quality in 144 240 360 480 720 1080 best audio; do
             url_var="url_${quality}"
-            if [ -n "${{ steps.extract.outputs[url_var] }}" ]; then
-              echo "${{ steps.extract.outputs[url_var] }}" | while read -r URL; do
+            urls="${{ steps.extract.outputs[url_var] }}"
+            if [ -n "$urls" ]; then
+              echo "$urls" | while read -r URL; do
                 [ -z "$URL" ] && continue
                 echo ""
                 echo "========================================="
