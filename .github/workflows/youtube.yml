@@ -32,27 +32,46 @@ jobs:
         run: |
           MSG="${{ steps.message.outputs.msg }}"
           
-          # Define quality patterns
-          patterns=(
-            "yt-144:"
-            "yt-240:"
-            "yt-360:"
-            "yt-480:"
-            "yt-720:"
-            "yt-1080:"
-            "yt-best:"
-            "yt-audio:"
-          )
+          # Extract URLs for each quality
+          if echo "$MSG" | grep -q 'yt-144:'; then
+            urls=$(echo "$MSG" | grep -oP 'yt-144:\s*\Khttps?://[^\s]+')
+            echo "url_144=$urls" >> $GITHUB_OUTPUT
+          fi
           
-          for pattern in "${patterns[@]}"; do
-            quality="${pattern#yt-}"
-            quality="${quality%:}"
-            urls=$(echo "$MSG" | grep -oP "${pattern}\s*\Khttps?://[^\s]+" || true)
-            if [ -n "$urls" ]; then
-              echo "url_${quality}=${urls}" >> $GITHUB_OUTPUT
-              echo "Found $pattern: $urls"
-            fi
-          done
+          if echo "$MSG" | grep -q 'yt-240:'; then
+            urls=$(echo "$MSG" | grep -oP 'yt-240:\s*\Khttps?://[^\s]+')
+            echo "url_240=$urls" >> $GITHUB_OUTPUT
+          fi
+          
+          if echo "$MSG" | grep -q 'yt-360:'; then
+            urls=$(echo "$MSG" | grep -oP 'yt-360:\s*\Khttps?://[^\s]+')
+            echo "url_360=$urls" >> $GITHUB_OUTPUT
+          fi
+          
+          if echo "$MSG" | grep -q 'yt-480:'; then
+            urls=$(echo "$MSG" | grep -oP 'yt-480:\s*\Khttps?://[^\s]+')
+            echo "url_480=$urls" >> $GITHUB_OUTPUT
+          fi
+          
+          if echo "$MSG" | grep -q 'yt-720:'; then
+            urls=$(echo "$MSG" | grep -oP 'yt-720:\s*\Khttps?://[^\s]+')
+            echo "url_720=$urls" >> $GITHUB_OUTPUT
+          fi
+          
+          if echo "$MSG" | grep -q 'yt-1080:'; then
+            urls=$(echo "$MSG" | grep -oP 'yt-1080:\s*\Khttps?://[^\s]+')
+            echo "url_1080=$urls" >> $GITHUB_OUTPUT
+          fi
+          
+          if echo "$MSG" | grep -q 'yt-best:'; then
+            urls=$(echo "$MSG" | grep -oP 'yt-best:\s*\Khttps?://[^\s]+')
+            echo "url_best=$urls" >> $GITHUB_OUTPUT
+          fi
+          
+          if echo "$MSG" | grep -q 'yt-audio:'; then
+            urls=$(echo "$MSG" | grep -oP 'yt-audio:\s*\Khttps?://[^\s]+')
+            echo "url_audio=$urls" >> $GITHUB_OUTPUT
+          fi
           
           if grep -q "url_" $GITHUB_OUTPUT; then
             echo "found=true" >> $GITHUB_OUTPUT
@@ -82,22 +101,14 @@ jobs:
           
           chmod +x scripts/youtube/single-video.sh
           
-          # Process each quality level
-          for quality in 144 240 360 480 720 1080 best audio; do
-            url_var="url_${quality}"
-            # Use grep to extract the value from GITHUB_OUTPUT file
-            urls=$(grep "^${url_var}=" $GITHUB_OUTPUT | cut -d'=' -f2- || true)
-            if [ -n "$urls" ]; then
-              echo "$urls" | while read -r URL; do
-                [ -z "$URL" ] && continue
-                echo ""
-                echo "========================================="
-                echo "Processing: $URL with quality $quality"
-                echo "========================================="
-                ./scripts/youtube/single-video.sh "$URL" "$quality" "cookies.txt"
-              done
-            fi
-          done
+          # Process 480p (example)
+          if [ -n "${{ steps.extract.outputs.url_480 }}" ]; then
+            echo "${{ steps.extract.outputs.url_480 }}" | while read -r URL; do
+              [ -z "$URL" ] && continue
+              echo "Processing 480p: $URL"
+              ./scripts/youtube/single-video.sh "$URL" "480" "cookies.txt"
+            done
+          fi
           
           # Clean up
           rm -f cookies.txt
@@ -110,14 +121,10 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          # First, try to pull with rebase, ignore if fails
           git pull origin main --rebase || true
-          # Add all changes (including new directories)
           git add downloads/
-          # Commit if there are changes
           git commit -m "Add YouTube content [skip ci]" || echo "No changes to commit"
-          # Push with force lease to avoid conflicts
-          git push --force-with-lease || git push
+          git push
 
       # ============================================
       # List downloaded files
@@ -125,7 +132,5 @@ jobs:
       - name: List downloaded files
         if: steps.extract.outputs.found == 'true'
         run: |
-          echo "========================================="
           echo "Files in downloads/youtube/:"
-          echo "========================================="
-          ls -la downloads/youtube/
+          ls -la downloads/youtube/ || echo "No files found"
