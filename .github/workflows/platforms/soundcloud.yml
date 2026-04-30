@@ -1,9 +1,10 @@
 name: SoundCloud Platform
 
 on:
-  workflow_call:
+  workflow_dispatch:
     inputs:
       url:
+        description: 'SoundCloud URL'
         required: true
         type: string
 
@@ -19,7 +20,7 @@ jobs:
       - name: Get URL
         id: url
         run: |
-          URL="${{ inputs.url }}"
+          URL="${{ github.event.inputs.url }}"
           echo "url=$URL" >> $GITHUB_OUTPUT
           echo "Processing: $URL"
 
@@ -28,32 +29,45 @@ jobs:
         run: |
           URL="${{ steps.url.outputs.url }}"
           
-          # Check if it's an album (contains /sets/ and we can detect playlist vs album)
-          # For now, use a simple heuristic:
-          # - If URL contains /sets/ and also contains a numeric ID pattern, it's likely a playlist
-          # - Otherwise, treat as single track or album
-          
-          if [[ "$URL" == *"/sets/"* ]]; then
-            # Try to get info to distinguish album from playlist
-            INFO=$(python3 -m yt_dlp --skip-download --dump-json "$URL" 2>/dev/null)
-            PLAYLIST_TITLE=$(echo "$INFO" | jq -r '.playlist_title // empty')
-            UPLOADER=$(echo "$INFO" | jq -r '.uploader // empty')
-            
-            # If playlist_title contains Persian characters or is long, it's likely a playlist
-            if echo "$PLAYLIST_TITLE" | grep -qP '[\x{0600}-\x{06FF}]'; then
-              echo "type=playlist" >> $GITHUB_OUTPUT
-            elif [[ -n "$PLAYLIST_TITLE" && "$PLAYLIST_TITLE" != "$UPLOADER" ]]; then
-              echo "type=playlist" >> $GITHUB_OUTPUT
-            else
-              echo "type=album" >> $GITHUB_OUTPUT
-            fi
-          elif [[ "$URL" =~ ^https://soundcloud\.com/[^/]+/[^/]+$ ]]; then
+          # Single track detection
+          if [[ "$URL" =~ ^https://soundcloud\.com/[^/]+/[^/]+$ ]] && [[ "$URL" != *"/sets/"* ]] && [[ "$URL" != *"/playlists/"* ]]; then
             echo "type=single" >> $GITHUB_OUTPUT
-          else
-            echo "type=playlist" >> $GITHUB_OUTPUT
+            echo "Detected: single track"
+            exit 0
           fi
           
-          echo "Detected type: $(cat $GITHUB_OUTPUT | grep type | cut -d= -f2)"
+          # Album or playlist detection (both use /sets/)
+          if [[ "$URL" == *"/sets/"* ]]; then
+            # Try to get metadata to distinguish
+            INFO=$(python3 -m yt_dlp --skip-download --dump-json "$URL" 2>/dev/null)
+            UPLOADER=$(echo "$INFO" | jq -r '.uploader // empty')
+            PLAYLIST_TITLE=$(echo "$INFO" | jq -r '.playlist_title // empty')
+            TRACK_COUNT=$(echo "$INFO" | jq -r '.playlist_count // 0')
+            
+            # If playlist_title contains Persian characters or track count > 20, it's likely a playlist
+            if echo "$PLAYLIST_TITLE" | grep -qP '[\x{0600}-\x{06FF}]'; then
+              echo "type=playlist" >> $GITHUB_OUTPUT
+              echo "Detected: playlist (Persian title)"
+            elif [ "$TRACK_COUNT" -gt 20 ]; then
+              echo "type=playlist" >> $GITHUB_OUTPUT
+              echo "Detected: playlist (more than 20 tracks)"
+            elif [[ -n "$UPLOADER" ]] && [[ "$PLAYLIST_TITLE" != "$UPLOADER"* ]]; then
+              echo "type=playlist" >> $GITHUB_OUTPUT
+              echo "Detected: playlist (different from uploader)"
+            else
+              echo "type=album" >> $GITHUB_OUTPUT
+              echo "Detected: album"
+            fi
+          else
+            echo "type=single" >> $GITHUB_OUTPUT
+            echo "Detected: single track (fallback)"
+          fi
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ffmpeg zip jq
+          pip install yt-dlp
 
       - name: Run script
         run: |
