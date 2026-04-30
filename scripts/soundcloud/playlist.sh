@@ -1,11 +1,9 @@
 #!/bin/bash
 
-# Load config
 if [ -f "config/soundcloud.conf" ]; then
     source "config/soundcloud.conf"
 fi
 
-# Set defaults
 AUDIO_FORMAT="${AUDIO_FORMAT:-mp3}"
 DOWNLOAD_PATH="${DOWNLOAD_PATH:-downloads/soundcloud}"
 MAX_ZIP_SIZE_MB="${MAX_ZIP_SIZE_MB:-90}"
@@ -25,7 +23,6 @@ else
 fi
 
 PLAYLIST_NAME=$(echo "$PLAYLIST_NAME" | sed 's/[\/\\:*?"<>|]/_/g' | sed 's/[[:space:]]/_/g' | sed 's/__*/_/g' | sed 's/^_//;s/_$//')
-
 echo "Playlist: $PLAYLIST_NAME"
 
 mkdir -p "$DOWNLOAD_PATH"
@@ -39,35 +36,23 @@ while [ -f "$FINAL_ZIP_NAME" ]; do
     COUNTER=$((COUNTER + 1))
 done
 
-echo "ZIP file will be: $FINAL_ZIP_NAME"
-
-# Download WITHOUT track number
 python3 -m yt_dlp --extract-audio --audio-format "$AUDIO_FORMAT" \
   --embed-thumbnail --convert-thumbnails jpg \
-  --retries 10 \
-  --fragment-retries 10 \
-  --retry-sleep exp=1:60 \
-  --sleep-interval 3 \
-  --max-sleep-interval 10 \
-  --limit-rate 500K \
-  --output "%(artist)s - %(track)s.%(ext)s" \
-  "$URL"
+  --retries 10 --fragment-retries 10 --retry-sleep exp=1:60 \
+  --sleep-interval 3 --max-sleep-interval 10 --limit-rate 500K \
+  --output "%(artist)s - %(track)s.%(ext)s" "$URL"
 
 if [ $? -ne 0 ]; then
     echo "Download failed"
     exit 1
 fi
 
-# Check files
 FILE_COUNT=$(find . -maxdepth 1 -type f -name "*.mp3" | wc -l)
-echo "Found $FILE_COUNT MP3 files"
-
 if [ "$FILE_COUNT" -eq 0 ]; then
-    echo "No MP3 files were downloaded"
+    echo "No MP3 files downloaded"
     exit 1
 fi
 
-# Create ZIP
 TOTAL_SIZE=$(du -sb . | cut -f1)
 MAX_SIZE_BYTES=$((MAX_ZIP_SIZE_MB * 1024 * 1024))
 
@@ -77,11 +62,5 @@ else
     zip -r "$FINAL_ZIP_NAME" . -x "*.zip" "*.z*"
 fi
 
-if [ -f "$FINAL_ZIP_NAME" ] || [ -f "${FINAL_ZIP_NAME%.zip}.z01" ]; then
-    echo "✅ Playlist download completed: $FINAL_ZIP_NAME"
-    rm -f *.mp3 *.jpg *.webp 2>/dev/null
-    ls -la "${FINAL_ZIP_NAME}"* 2>/dev/null || ls -la "${FINAL_ZIP_NAME%.zip}".z* 2>/dev/null
-else
-    echo "ZIP creation failed"
-    exit 1
-fi
+rm -f *.mp3 *.jpg *.webp 2>/dev/null
+echo "Playlist download completed: $FINAL_ZIP_NAME"
