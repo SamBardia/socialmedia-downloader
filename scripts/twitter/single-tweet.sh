@@ -2,7 +2,8 @@
 
 # ============================================
 # Twitter Single Tweet Downloader (Final)
-# Full Persian/Unicode support + Time + Stats + Numbering
+# Full Persian/Unicode support + Time + Numbering
+# Without stats (views, likes, retweets, replies)
 # ============================================
 
 if [ -f "config/twitter.conf" ]; then
@@ -33,6 +34,13 @@ if [ -z "$USERNAME" ]; then
 fi
 if [ -z "$USERNAME" ]; then
     USERNAME=$(echo "$METADATA" | jq -r '.display_id // empty')
+fi
+# Extract username from URL if still empty
+if [ -z "$USERNAME" ]; then
+    USERNAME=$(echo "$URL" | grep -oP 'x\.com/\K[^/]+')
+fi
+if [ -z "$USERNAME" ]; then
+    USERNAME=$(echo "$URL" | grep -oP 'twitter\.com/\K[^/]+')
 fi
 if [ -z "$USERNAME" ]; then
     USERNAME="unknown_user"
@@ -65,6 +73,12 @@ fi
 DESCRIPTION=$(echo "$METADATA" | jq -r '.description // empty')
 if [ -z "$DESCRIPTION" ]; then
     DESCRIPTION=$(echo "$METADATA" | jq -r '.title // empty')
+    # Remove "X 上的 " prefix and trailing " / X" if present
+    DESCRIPTION=$(echo "$DESCRIPTION" | sed 's/^X 上的 //' | sed 's/ \/ X$//')
+    # If after cleaning it's just the username or empty, try other fields
+    if [ -z "$DESCRIPTION" ] || [[ "$DESCRIPTION" == "$USERNAME" ]]; then
+        DESCRIPTION=""
+    fi
 fi
 if [ -z "$DESCRIPTION" ]; then
     DESCRIPTION=$(echo "$METADATA" | jq -r '.alt_title // empty')
@@ -73,21 +87,8 @@ if [ -z "$DESCRIPTION" ]; then
     DESCRIPTION=$(echo "$METADATA" | jq -r '.webpage_url // empty')
 fi
 if [ -z "$DESCRIPTION" ]; then
-    DESCRIPTION="Tweet text not available (possibly just a link or quote)"
+    DESCRIPTION="Tweet contains only a link (no additional text)"
 fi
-
-# ============================================
-# Extract stats with multiple fallbacks
-# ============================================
-VIEWS=$(echo "$METADATA" | jq -r '.view_count // .views // empty')
-LIKES=$(echo "$METADATA" | jq -r '.like_count // .favorite_count // empty')
-RETWEETS=$(echo "$METADATA" | jq -r '.retweet_count // .retweets // empty')
-REPLIES=$(echo "$METADATA" | jq -r '.reply_count // .replies // empty')
-
-[ -z "$VIEWS" ] || [ "$VIEWS" = "null" ] && VIEWS="N/A"
-[ -z "$LIKES" ] || [ "$LIKES" = "null" ] && LIKES="N/A"
-[ -z "$RETWEETS" ] || [ "$RETWEETS" = "null" ] && RETWEETS="N/A"
-[ -z "$REPLIES" ] || [ "$REPLIES" = "null" ] && REPLIES="N/A"
 
 # ============================================
 # Handle duplicate files
@@ -112,7 +113,7 @@ cd "$TEMP_DIR"
 printf '%s\n' "$DESCRIPTION" > "${TEMP_DIR}.txt"
 
 # ============================================
-# Save info file
+# Save info file (without stats)
 # ============================================
 {
     printf 'Tweet ID: %s\n' "$TWEET_ID"
@@ -120,11 +121,6 @@ printf '%s\n' "$DESCRIPTION" > "${TEMP_DIR}.txt"
     printf 'Date: %s\n' "$TWEET_DATE"
     printf 'Time: %s\n' "$TWEET_TIME"
     printf 'URL: %s\n' "$URL"
-    printf '---\n'
-    printf 'Views: %s\n' "$VIEWS"
-    printf 'Likes: %s\n' "$LIKES"
-    printf 'Retweets: %s\n' "$RETWEETS"
-    printf 'Replies: %s\n' "$REPLIES"
 } > "${TEMP_DIR}(info).txt"
 
 # ============================================
