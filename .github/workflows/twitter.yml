@@ -1,12 +1,9 @@
 name: Twitter Downloader
 
 on:
+  push:
+    branches: [ "main" ]
   workflow_dispatch:
-    inputs:
-      urls:
-        description: 'Twitter URLs (one per line)'
-        required: true
-        type: string
 
 jobs:
   download:
@@ -17,52 +14,56 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      # ============================================
-      # Install dependencies
-      # ============================================
-      - name: Install dependencies
+      - name: Get commit message
+        id: message
         run: |
-          sudo apt-get update
-          sudo apt-get install -y ffmpeg zip jq
-          pip install yt-dlp
+          echo "msg<<EOF" >> $GITHUB_OUTPUT
+          git log -1 --pretty=%B >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
 
-      # ============================================
-      # Process all Twitter URLs
-      # ============================================
-      - name: Process all Twitter URLs
+      - name: Extract all Twitter URLs
+        id: extract
+        run: |
+          MSG="${{ steps.message.outputs.msg }}"
+          URLS=$(echo "$MSG" | grep -oP 'tw:\s*\Khttps?://[^\s]+')
+          if [ -n "$URLS" ]; then
+            echo "urls<<EOF" >> $GITHUB_OUTPUT
+            echo "$URLS" >> $GITHUB_OUTPUT
+            echo "EOF" >> $GITHUB_OUTPUT
+            echo "found=true" >> $GITHUB_OUTPUT
+          else
+            echo "found=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Find fastest Ubuntu mirror
+        if: steps.extract.outputs.found == 'true'
+        id: mirror
+        run: |
+          sudo sed -i 's|azure.archive.ubuntu.com/ubuntu|archive.ubuntu.com/ubuntu|g' /etc/apt/sources.list
+          sudo apt-get update
+
+      - name: Install dependencies
+        if: steps.extract.outputs.found == 'true'
+        run: |
+          sudo apt-get install -y --no-install-recommends ffmpeg zip jq
+          pip install --no-deps yt-dlp
+          pip install brotlicffi
+
+      - name: Process all URLs
+        if: steps.extract.outputs.found == 'true'
         run: |
           chmod +x scripts/twitter/single-tweet.sh
-          
-          echo "${{ github.event.inputs.urls }}" | while read -r URL; do
+          echo "${{ steps.extract.outputs.urls }}" | while read -r URL; do
             [ -z "$URL" ] && continue
-            
-            echo ""
-            echo "========================================="
             echo "Processing: $URL"
-            echo "========================================="
-            
             ./scripts/twitter/single-tweet.sh "$URL"
-            
-            echo "Completed: $URL"
           done
 
-      # ============================================
-      # Push downloaded files to repository
-      # ============================================
       - name: Push to repository
+        if: steps.extract.outputs.found == 'true'
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add downloads/twitter/
-          git commit -m "Add Twitter content [skip ci]" || echo "No changes to commit"
+          git commit -m "Add Twitter content [skip ci]" || echo "No changes"
           git push
-
-      # ============================================
-      # List downloaded files
-      # ============================================
-      - name: List downloaded files
-        run: |
-          echo "========================================="
-          echo "Files in downloads/twitter/:"
-          echo "========================================="
-          ls -la downloads/twitter/
