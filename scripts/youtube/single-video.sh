@@ -3,6 +3,7 @@
 # ============================================
 # YouTube Single Video Downloader
 # With fallback logic for unavailable quality
+# SECURE: No cookie printing or copying
 # ============================================
 
 if [ -f "config/youtube.conf" ]; then
@@ -21,9 +22,6 @@ if [ -z "$COOKIE_FILE" ] || [ ! -f "$COOKIE_FILE" ]; then
     echo "ERROR: Cookie file not found"
     exit 1
 fi
-
-# Quality order (low to high)
-QUALITIES=("144" "240" "360" "480" "720" "1080")
 
 # ============================================
 # Helper functions
@@ -161,7 +159,6 @@ fi
 # ============================================
 # Handle regular quality request with fallback
 # ============================================
-# Remove 'p' from requested quality if present
 REQUESTED_CLEAN=$(echo "$REQUESTED_QUALITY" | sed 's/p//')
 
 # Check if requested quality is available
