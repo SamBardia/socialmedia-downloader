@@ -32,9 +32,6 @@ jobs:
         run: |
           MSG="${{ steps.message.outputs.msg }}"
           
-          # Initialize arrays
-          declare -A quality_urls
-          
           # Define quality patterns
           patterns=(
             "yt-144:"
@@ -50,20 +47,14 @@ jobs:
           for pattern in "${patterns[@]}"; do
             quality="${pattern#yt-}"
             quality="${quality%:}"
-            # Extract URLs for this pattern
             urls=$(echo "$MSG" | grep -oP "${pattern}\s*\Khttps?://[^\s]+" || true)
             if [ -n "$urls" ]; then
-              quality_urls["$quality"]="$urls"
-              echo "Found $pattern $urls"
+              echo "url_${quality}=${urls}" >> $GITHUB_OUTPUT
+              echo "Found $pattern: $urls"
             fi
           done
           
-          # Save to output
-          for quality in "${!quality_urls[@]}"; do
-            echo "url_${quality}=${quality_urls[$quality]}" >> $GITHUB_OUTPUT
-          done
-          
-          if [ ${#quality_urls[@]} -gt 0 ]; then
+          if grep -q "url_" $GITHUB_OUTPUT; then
             echo "found=true" >> $GITHUB_OUTPUT
           else
             echo "found=false" >> $GITHUB_OUTPUT
@@ -81,17 +72,21 @@ jobs:
           pip install brotlicffi
 
       # ============================================
-      # Process each YouTube URL
+      # Process all YouTube URLs
       # ============================================
-      - name: Process YouTube URLs
+      - name: Process all YouTube URLs
         if: steps.extract.outputs.found == 'true'
         run: |
+          # Create cookie file from secret
+          echo "${{ secrets.YOUTUBE_COOKIES }}" > cookies.txt
+          
           chmod +x scripts/youtube/single-video.sh
           
           # Process each quality level
           for quality in 144 240 360 480 720 1080 best audio; do
             url_var="url_${quality}"
-            urls="${{ steps.extract.outputs[url_var] }}"
+            # Use grep to extract the value from GITHUB_OUTPUT file
+            urls=$(grep "^${url_var}=" $GITHUB_OUTPUT | cut -d'=' -f2- || true)
             if [ -n "$urls" ]; then
               echo "$urls" | while read -r URL; do
                 [ -z "$URL" ] && continue
@@ -99,10 +94,13 @@ jobs:
                 echo "========================================="
                 echo "Processing: $URL with quality $quality"
                 echo "========================================="
-                ./scripts/youtube/single-video.sh "$URL" "$quality"
+                ./scripts/youtube/single-video.sh "$URL" "$quality" "cookies.txt"
               done
             fi
           done
+          
+          # Clean up
+          rm -f cookies.txt
 
       # ============================================
       # Push to repository
