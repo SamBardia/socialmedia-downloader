@@ -8,8 +8,6 @@ on:
 jobs:
   detect-and-dispatch:
     runs-on: ubuntu-latest
-    permissions:
-      contents: write
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -21,79 +19,65 @@ jobs:
           git log -1 --pretty=%B >> $GITHUB_OUTPUT
           echo "EOF" >> $GITHUB_OUTPUT
 
-      - name: Extract SoundCloud links
+      - name: Extract links by platform
         id: extract
         run: |
           MSG="${{ steps.message.outputs.msg }}"
-          echo "$MSG" | grep -oP 'sc:\s*https?://[^\s]+' > sc_urls.txt
-          echo "Found $(wc -l < sc_urls.txt) SoundCloud link(s)"
+          echo "$MSG" | grep -oP 'sc:\s*https?://[^\s]+' > sc_urls.txt || true
+          echo "$MSG" | grep -oP 'ig:\s*https?://[^\s]+' > ig_urls.txt || true
+          echo "$MSG" | grep -oP 'tt:\s*https?://[^\s]+' > tt_urls.txt || true
+          echo "$MSG" | grep -oP 'tw:\s*https?://[^\s]+' > tw_urls.txt || true
+          
+          echo "SC: $(wc -l < sc_urls.txt)"
+          echo "IG: $(wc -l < ig_urls.txt)"
+          echo "TT: $(wc -l < tt_urls.txt)"
+          echo "TW: $(wc -l < tw_urls.txt)"
 
-      - name: Setup dependencies
+      - name: Setup dependencies (shared cache)
         run: |
           sudo apt-get update
           sudo apt-get install -y ffmpeg zip jq
           pip install yt-dlp
 
-      - name: Process SoundCloud links
+      - name: Dispatch to SoundCloud
         run: |
-          chmod +x scripts/soundcloud/single.sh 2>/dev/null || true
-          chmod +x scripts/soundcloud/album.sh 2>/dev/null || true
-          chmod +x scripts/soundcloud/playlist.sh 2>/dev/null || true
-          
           while IFS= read -r line; do
             URL=$(echo "$line" | sed 's/^sc:\s*//')
-            echo ""
-            echo "========================================="
-            echo "Processing: $URL"
-            echo "========================================="
-            
-            # Detect content type
-            if [[ "$URL" == *"/sets/"* ]]; then
-              # Check if it's a playlist (has username before /sets/) or album (direct /sets/NAME)
-              # Album: soundcloud.com/sets/NAME or soundcloud.com/artist/sets/NAME where artist is the same as album artist
-              # Playlist: soundcloud.com/username/sets/NAME where username is NOT the artist
-              # For now, treat all /sets/ as albums (since SoundCloud calls them "sets")
-              # Playlists are usually under /playlists/ not /sets/
-              if [[ "$URL" == *"/playlists/"* ]]; then
-                echo "Type: Playlist"
-                ./scripts/soundcloud/playlist.sh "$URL"
-              else
-                echo "Type: Album"
-                ./scripts/soundcloud/album.sh "$URL"
-              fi
-            elif [[ "$URL" == *"/playlists/"* ]]; then
-              echo "Type: Playlist"
-              ./scripts/soundcloud/playlist.sh "$URL"
-            else
-              echo "Type: Single Track"
-              ./scripts/soundcloud/single.sh "$URL"
+            if [[ -n "$URL" ]]; then
+              echo "Dispatching to SoundCloud: $URL"
+              gh workflow run platforms/soundcloud.yml -f url="$URL"
             fi
-            
-            echo "Completed: $URL"
           done < sc_urls.txt
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Push to repository
+      - name: Dispatch to Instagram
         run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add downloads/soundcloud/
-          git commit -m "Add SoundCloud content [skip ci]" || echo "No changes to commit"
-          git push
+          while IFS= read -r line; do
+            URL=$(echo "$line" | sed 's/^ig:\s*//')
+            if [[ -n "$URL" ]]; then
+              echo "Dispatching to Instagram: $URL"
+              # gh workflow run platforms/instagram.yml -f url="$URL"
+              echo "Instagram workflow not yet implemented"
+            fi
+          done < ig_urls.txt
 
-      - name: List files
+      - name: Dispatch to TikTok
         run: |
-          echo ""
-          echo "========================================="
-          echo "Files in downloads/soundcloud/:"
-          echo "========================================="
-          ls -la downloads/soundcloud/
-          if [ -d "downloads/soundcloud" ] && [ "$(ls -A downloads/soundcloud)" ]; then
-            for file in downloads/soundcloud/*; do
-              if [ -f "$file" ]; then
-                echo ""
-                echo "📄 $(basename "$file")"
-              fi
-            done
-          else
-            echo "No files found in downloads/soundcloud/"
-          fi
+          while IFS= read -r line; do
+            URL=$(echo "$line" | sed 's/^tt:\s*//')
+            if [[ -n "$URL" ]]; then
+              echo "Dispatching to TikTok: $URL"
+              echo "TikTok workflow not yet implemented"
+            fi
+          done < tt_urls.txt
+
+      - name: Dispatch to Twitter
+        run: |
+          while IFS= read -r line; do
+            URL=$(echo "$line" | sed 's/^tw:\s*//')
+            if [[ -n "$URL" ]]; then
+              echo "Dispatching to Twitter: $URL"
+              echo "Twitter workflow not yet implemented"
+            fi
+          done < tw_urls.txt
