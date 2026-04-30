@@ -32,7 +32,6 @@ jobs:
         run: |
           MSG="${{ steps.message.outputs.msg }}"
           
-          # Extract URLs for each quality
           if echo "$MSG" | grep -q 'yt-144:'; then
             urls=$(echo "$MSG" | grep -oP 'yt-144:\s*\Khttps?://[^\s]+')
             echo "url_144=$urls" >> $GITHUB_OUTPUT
@@ -91,27 +90,83 @@ jobs:
           pip install brotlicffi
 
       # ============================================
-      # Process all YouTube URLs
+      # Process all YouTube URLs (secure cookie handling)
       # ============================================
       - name: Process all YouTube URLs
         if: steps.extract.outputs.found == 'true'
         run: |
-          # Create cookie file from secret
-          echo "${{ secrets.YOUTUBE_COOKIES }}" > cookies.txt
+          # Create temporary secure cookie file (not in workspace)
+          COOKIE_FILE=$(mktemp)
+          echo "${{ secrets.YOUTUBE_COOKIES }}" > "$COOKIE_FILE"
           
           chmod +x scripts/youtube/single-video.sh
           
-          # Process 480p (example)
-          if [ -n "${{ steps.extract.outputs.url_480 }}" ]; then
-            echo "${{ steps.extract.outputs.url_480 }}" | while read -r URL; do
+          # Process 144p
+          if [ -n "${{ steps.extract.outputs.url_144 }}" ]; then
+            echo "${{ steps.extract.outputs.url_144 }}" | while read -r URL; do
               [ -z "$URL" ] && continue
-              echo "Processing 480p: $URL"
-              ./scripts/youtube/single-video.sh "$URL" "480" "cookies.txt"
+              ./scripts/youtube/single-video.sh "$URL" "144" "$COOKIE_FILE"
             done
           fi
           
-          # Clean up
-          rm -f cookies.txt
+          # Process 240p
+          if [ -n "${{ steps.extract.outputs.url_240 }}" ]; then
+            echo "${{ steps.extract.outputs.url_240 }}" | while read -r URL; do
+              [ -z "$URL" ] && continue
+              ./scripts/youtube/single-video.sh "$URL" "240" "$COOKIE_FILE"
+            done
+          fi
+          
+          # Process 360p
+          if [ -n "${{ steps.extract.outputs.url_360 }}" ]; then
+            echo "${{ steps.extract.outputs.url_360 }}" | while read -r URL; do
+              [ -z "$URL" ] && continue
+              ./scripts/youtube/single-video.sh "$URL" "360" "$COOKIE_FILE"
+            done
+          fi
+          
+          # Process 480p
+          if [ -n "${{ steps.extract.outputs.url_480 }}" ]; then
+            echo "${{ steps.extract.outputs.url_480 }}" | while read -r URL; do
+              [ -z "$URL" ] && continue
+              ./scripts/youtube/single-video.sh "$URL" "480" "$COOKIE_FILE"
+            done
+          fi
+          
+          # Process 720p
+          if [ -n "${{ steps.extract.outputs.url_720 }}" ]; then
+            echo "${{ steps.extract.outputs.url_720 }}" | while read -r URL; do
+              [ -z "$URL" ] && continue
+              ./scripts/youtube/single-video.sh "$URL" "720" "$COOKIE_FILE"
+            done
+          fi
+          
+          # Process 1080p
+          if [ -n "${{ steps.extract.outputs.url_1080 }}" ]; then
+            echo "${{ steps.extract.outputs.url_1080 }}" | while read -r URL; do
+              [ -z "$URL" ] && continue
+              ./scripts/youtube/single-video.sh "$URL" "1080" "$COOKIE_FILE"
+            done
+          fi
+          
+          # Process best quality
+          if [ -n "${{ steps.extract.outputs.url_best }}" ]; then
+            echo "${{ steps.extract.outputs.url_best }}" | while read -r URL; do
+              [ -z "$URL" ] && continue
+              ./scripts/youtube/single-video.sh "$URL" "best" "$COOKIE_FILE"
+            done
+          fi
+          
+          # Process audio only
+          if [ -n "${{ steps.extract.outputs.url_audio }}" ]; then
+            echo "${{ steps.extract.outputs.url_audio }}" | while read -r URL; do
+              [ -z "$URL" ] && continue
+              ./scripts/youtube/single-video.sh "$URL" "audio" "$COOKIE_FILE"
+            done
+          fi
+          
+          # Securely delete cookie file
+          shred -u "$COOKIE_FILE" 2>/dev/null || rm -f "$COOKIE_FILE"
 
       # ============================================
       # Push to repository
