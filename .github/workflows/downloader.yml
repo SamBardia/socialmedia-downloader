@@ -26,14 +26,20 @@ jobs:
           echo "$MSG" | grep -oP 'sc:\s*https?://[^\s]+' | sed 's/^sc:\s*//' > sc_urls.txt
           echo "Found $(wc -l < sc_urls.txt) SoundCloud link(s)"
 
-      - name: Dispatch to SoundCloud platform
+      - name: Dispatch to SoundCloud
         run: |
           while IFS= read -r URL; do
             if [[ -n "$URL" ]]; then
               echo "Dispatching: $URL"
-              gh workflow run platforms/soundcloud.yml -f url="$URL"
-              sleep 2
+              # اینجا از `uses` استفاده می‌کنیم، نه `gh workflow run`
+              echo "url=${URL}" >> $GITHUB_OUTPUT
             fi
           done < sc_urls.txt
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  call-soundcloud:
+    needs: detect-and-dispatch
+    if: always()
+    uses: ./.github/workflows/platforms/soundcloud.yml
+    with:
+      url: ${{ needs.detect-and-dispatch.outputs.url }}
+    secrets: inherit
