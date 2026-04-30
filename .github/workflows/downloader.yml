@@ -6,7 +6,7 @@ on:
   workflow_dispatch:
 
 jobs:
-  detect-and-dispatch:
+  parse-and-trigger:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -19,27 +19,29 @@ jobs:
           git log -1 --pretty=%B >> $GITHUB_OUTPUT
           echo "EOF" >> $GITHUB_OUTPUT
 
-      - name: Extract SoundCloud links
+      - name: Extract SoundCloud URLs
         id: extract
         run: |
           MSG="${{ steps.message.outputs.msg }}"
-          echo "$MSG" | grep -oP 'sc:\s*https?://[^\s]+' | sed 's/^sc:\s*//' > sc_urls.txt
-          echo "Found $(wc -l < sc_urls.txt) SoundCloud link(s)"
+          URLS=$(echo "$MSG" | grep -oP 'sc:\s*\Khttps?://[^\s]+' | tr '\n' ',')
+          echo "urls=${URLS%,}" >> $GITHUB_OUTPUT
+          if [ -n "$URLS" ]; then
+            echo "found=true" >> $GITHUB_OUTPUT
+          else
+            echo "found=false" >> $GITHUB_OUTPUT
+          fi
 
-      - name: Dispatch to SoundCloud
-        run: |
-          while IFS= read -r URL; do
-            if [[ -n "$URL" ]]; then
-              echo "Dispatching: $URL"
-              # اینجا از `uses` استفاده می‌کنیم، نه `gh workflow run`
-              echo "url=${URL}" >> $GITHUB_OUTPUT
-            fi
-          done < sc_urls.txt
-
-  call-soundcloud:
-    needs: detect-and-dispatch
-    if: always()
-    uses: ./.github/workflows/platforms/soundcloud.yml
-    with:
-      url: ${{ needs.detect-and-dispatch.outputs.url }}
-    secrets: inherit
+      - name: Trigger SoundCloud workflow
+        if: steps.extract.outputs.found == 'true'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            await github.rest.actions.createWorkflowDispatch({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              workflow_id: 'soundcloud.yml',
+              ref: 'main',
+              inputs: {
+                urls: '${{ steps.extract.outputs.urls }}'
+              }
+            })
