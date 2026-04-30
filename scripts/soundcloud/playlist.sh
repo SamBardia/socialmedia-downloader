@@ -11,16 +11,13 @@ DOWNLOAD_PATH="${DOWNLOAD_PATH:-downloads/soundcloud}"
 MAX_ZIP_SIZE_MB="${MAX_ZIP_SIZE_MB:-90}"
 SPLIT_LARGE_FILES="${SPLIT_LARGE_FILES:-true}"
 
-# Get URL from first argument
 URL="$1"
 
-# Extract playlist name from URL
 PLAYLIST_NAME_RAW=$(echo "$URL" | sed -n 's|.*/sets/\([^/?]*\).*|\1|p')
 if [ -z "$PLAYLIST_NAME_RAW" ]; then
     PLAYLIST_NAME_RAW=$(echo "$URL" | sed -n 's|.*/playlists/\([^/?]*\).*|\1|p')
 fi
 
-# Clean playlist name
 if echo "$PLAYLIST_NAME_RAW" | grep -qP '[\x{0600}-\x{06FF}]'; then
     PLAYLIST_NAME="Playlist"
 else
@@ -31,11 +28,9 @@ PLAYLIST_NAME=$(echo "$PLAYLIST_NAME" | sed 's/[\/\\:*?"<>|]/_/g' | sed 's/[[:sp
 
 echo "Playlist: $PLAYLIST_NAME"
 
-# Create download directory
 mkdir -p "$DOWNLOAD_PATH"
 cd "$DOWNLOAD_PATH"
 
-# Find unique ZIP filename
 BASE_ZIP_NAME="${PLAYLIST_NAME}.zip"
 FINAL_ZIP_NAME="$BASE_ZIP_NAME"
 COUNTER=1
@@ -46,8 +41,7 @@ done
 
 echo "ZIP file will be: $FINAL_ZIP_NAME"
 
-# Download tracks WITHOUT track numbers (just artist - track name)
-echo "Downloading playlist tracks..."
+# Download WITHOUT track number
 python3 -m yt_dlp --extract-audio --audio-format "$AUDIO_FORMAT" \
   --embed-thumbnail --convert-thumbnails jpg \
   --retries 10 \
@@ -64,7 +58,7 @@ if [ $? -ne 0 ]; then
     exit 1
 fi
 
-# Count MP3 files
+# Check files
 FILE_COUNT=$(find . -maxdepth 1 -type f -name "*.mp3" | wc -l)
 echo "Found $FILE_COUNT MP3 files"
 
@@ -78,7 +72,6 @@ TOTAL_SIZE=$(du -sb . | cut -f1)
 MAX_SIZE_BYTES=$((MAX_ZIP_SIZE_MB * 1024 * 1024))
 
 if [ "$SPLIT_LARGE_FILES" = "true" ] && [ "$TOTAL_SIZE" -gt "$MAX_SIZE_BYTES" ]; then
-    echo "Total size exceeds ${MAX_ZIP_SIZE_MB}MB, splitting ZIP into parts"
     zip -s "${MAX_ZIP_SIZE_MB}m" -r "$FINAL_ZIP_NAME" . -x "*.zip" "*.z*"
 else
     zip -r "$FINAL_ZIP_NAME" . -x "*.zip" "*.z*"
