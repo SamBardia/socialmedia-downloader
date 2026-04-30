@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # ============================================
-# Twitter Single Tweet Downloader (Final with duplicate handling)
+# Twitter Single Tweet Downloader (Final)
 # Full Persian/Unicode support + Time + Stats + Numbering
 # ============================================
 
@@ -20,7 +20,7 @@ cd "$DOWNLOAD_PATH"
 
 METADATA=$(python3 -m yt_dlp --skip-download --dump-json "$URL" 2>/dev/null)
 
-# Extract username
+# Extract username (channel/uploader_id) - clean version
 USERNAME=$(echo "$METADATA" | jq -r '.channel // .uploader_id // empty')
 if [ -z "$USERNAME" ]; then
     USERNAME=$(echo "$METADATA" | jq -r '.uploader // empty' | sed 's/[^a-zA-Z0-9_]//g')
@@ -43,13 +43,26 @@ if [ -z "$TWEET_ID" ]; then
     TWEET_ID=$(echo "$METADATA" | jq -r '.id // empty')
 fi
 
-# Extract description
-DESCRIPTION=$(echo "$METADATA" | jq -r '.description // .title // empty')
-if [ -z "$DESCRIPTION" ] || [[ "$DESCRIPTION" == *"\\u"* ]]; then
+# ============================================
+# Extract description with multiple fallbacks
+# ============================================
+DESCRIPTION=$(echo "$METADATA" | jq -r '.description // empty')
+if [ -z "$DESCRIPTION" ]; then
     DESCRIPTION=$(echo "$METADATA" | jq -r '.title // empty')
 fi
+if [ -z "$DESCRIPTION" ]; then
+    DESCRIPTION=$(echo "$METADATA" | jq -r '.alt_title // empty')
+fi
+if [ -z "$DESCRIPTION" ]; then
+    DESCRIPTION=$(echo "$METADATA" | jq -r '.webpage_url // empty')
+fi
+if [ -z "$DESCRIPTION" ]; then
+    DESCRIPTION="Tweet text not available (possibly just a link or quote)"
+fi
 
-# Extract stats
+# ============================================
+# Extract stats with multiple fallbacks
+# ============================================
 VIEWS=$(echo "$METADATA" | jq -r '.view_count // .views // empty')
 LIKES=$(echo "$METADATA" | jq -r '.like_count // .favorite_count // empty')
 RETWEETS=$(echo "$METADATA" | jq -r '.retweet_count // .retweets // empty')
@@ -60,10 +73,11 @@ REPLIES=$(echo "$METADATA" | jq -r '.reply_count // .replies // empty')
 [ -z "$RETWEETS" ] || [ "$RETWEETS" = "null" ] && RETWEETS="N/A"
 [ -z "$REPLIES" ] || [ "$REPLIES" = "null" ] && REPLIES="N/A"
 
-# Base filename without number
+# ============================================
+# Handle duplicate files
+# ============================================
 BASE_FILENAME="${USERNAME} - ${TWEET_DATE} - ${TWEET_ID}"
 
-# Check for duplicate and add number if needed
 FINAL_ZIP_NAME="${BASE_FILENAME}.zip"
 COUNTER=1
 while [ -f "$FINAL_ZIP_NAME" ]; do
@@ -71,16 +85,19 @@ while [ -f "$FINAL_ZIP_NAME" ]; do
     COUNTER=$((COUNTER + 1))
 done
 
-# Extract the base name without .zip for temp folder
 TEMP_DIR="${FINAL_ZIP_NAME%.zip}"
 
 mkdir -p "$TEMP_DIR"
 cd "$TEMP_DIR"
 
-# Save description
+# ============================================
+# Save description with UTF-8 encoding
+# ============================================
 printf '%s\n' "$DESCRIPTION" > "${TEMP_DIR}.txt"
 
-# Save info
+# ============================================
+# Save info file
+# ============================================
 {
     printf 'Tweet ID: %s\n' "$TWEET_ID"
     printf 'Author: %s\n' "$USERNAME"
@@ -94,7 +111,9 @@ printf '%s\n' "$DESCRIPTION" > "${TEMP_DIR}.txt"
     printf 'Replies: %s\n' "$REPLIES"
 } > "${TEMP_DIR}(info).txt"
 
-# Download media
+# ============================================
+# Download media (ignore errors)
+# ============================================
 python3 -m yt_dlp \
     --retries 5 \
     --fragment-retries 5 \
@@ -104,7 +123,9 @@ python3 -m yt_dlp \
     --output "${TEMP_DIR} - %(playlist_index)02d.%(ext)s" \
     "$URL" 2>/dev/null
 
-# Fix any 'NA' filenames
+# ============================================
+# Fix 'NA' filenames and rename media files
+# ============================================
 for file in *NA*; do
     if [ -f "$file" ]; then
         newfile=$(echo "$file" | sed 's/ - NA//' | sed 's/NA - //')
@@ -112,7 +133,6 @@ for file in *NA*; do
     fi
 done
 
-# Ensure correct numbering for media files
 MEDIA_COUNTER=1
 for file in $(ls -1 *.mp4 *.jpg *.png *.jpeg *.webm 2>/dev/null | sort); do
     ext="${file##*.}"
@@ -125,7 +145,9 @@ done
 
 cd ..
 
-# Create ZIP archive
+# ============================================
+# Create ZIP archive (with splitting if needed)
+# ============================================
 TOTAL_SIZE=$(du -sb "$TEMP_DIR" | cut -f1)
 MAX_SIZE_BYTES=$((MAX_ZIP_SIZE_MB * 1024 * 1024))
 
