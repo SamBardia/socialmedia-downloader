@@ -1,9 +1,12 @@
 name: SoundCloud Downloader
 
 on:
-  push:
-    branches: [ "main" ]
   workflow_dispatch:
+    inputs:
+      urls:
+        description: 'SoundCloud URLs (one per line)'
+        required: true
+        type: string
 
 jobs:
   download:
@@ -15,38 +18,9 @@ jobs:
         uses: actions/checkout@v4
 
       # ============================================
-      # Get the commit message
-      # ============================================
-      - name: Get commit message
-        id: message
-        run: |
-          echo "msg<<EOF" >> $GITHUB_OUTPUT
-          git log -1 --pretty=%B >> $GITHUB_OUTPUT
-          echo "EOF" >> $GITHUB_OUTPUT
-
-      # ============================================
-      # Extract all SoundCloud URLs from commit message
-      # ============================================
-      - name: Extract all SoundCloud URLs
-        id: extract
-        run: |
-          MSG="${{ steps.message.outputs.msg }}"
-          URLS=$(echo "$MSG" | grep -oP 'sc:\s*\Khttps?://[^\s]+')
-          if [ -n "$URLS" ]; then
-            echo "urls<<EOF" >> $GITHUB_OUTPUT
-            echo "$URLS" >> $GITHUB_OUTPUT
-            echo "EOF" >> $GITHUB_OUTPUT
-            echo "found=true" >> $GITHUB_OUTPUT
-            echo "count=$(echo "$URLS" | wc -l)" >> $GITHUB_OUTPUT
-          else
-            echo "found=false" >> $GITHUB_OUTPUT
-          fi
-
-      # ============================================
       # Install dependencies (ffmpeg, zip, yt-dlp)
       # ============================================
       - name: Install dependencies
-        if: steps.extract.outputs.found == 'true'
         run: |
           sudo apt-get update
           sudo apt-get install -y ffmpeg zip jq
@@ -56,13 +30,12 @@ jobs:
       # Process all URLs (single track vs collection)
       # ============================================
       - name: Process all URLs
-        if: steps.extract.outputs.found == 'true'
         run: |
           # Make scripts executable
           chmod +x scripts/soundcloud/single.sh
           chmod +x scripts/soundcloud/album.sh
           
-          echo "${{ steps.extract.outputs.urls }}" | while read -r URL; do
+          echo "${{ github.event.inputs.urls }}" | while read -r URL; do
             [ -z "$URL" ] && continue
             
             echo ""
@@ -87,7 +60,6 @@ jobs:
       # Push downloaded files to repository
       # ============================================
       - name: Push to repository
-        if: steps.extract.outputs.found == 'true'
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
@@ -99,7 +71,6 @@ jobs:
       # List downloaded files
       # ============================================
       - name: List downloaded files
-        if: steps.extract.outputs.found == 'true'
         run: |
           echo "========================================="
           echo "Files in downloads/soundcloud/:"
