@@ -15,6 +15,12 @@ SPLIT_LARGE_FILES="${SPLIT_LARGE_FILES:-true}"
 
 URL="$1"
 REQUESTED_QUALITY="$2"
+COOKIE_FILE="$3"
+
+if [ -z "$COOKIE_FILE" ] || [ ! -f "$COOKIE_FILE" ]; then
+    echo "ERROR: Cookie file not found"
+    exit 1
+fi
 
 # Quality order (low to high)
 QUALITIES=("144" "240" "360" "480" "720" "1080")
@@ -96,10 +102,6 @@ get_best_available_quality() {
 mkdir -p "$DOWNLOAD_PATH"
 cd "$DOWNLOAD_PATH"
 
-# Create cookie file from secret
-COOKIE_FILE="cookies.txt"
-echo "${{ secrets.YOUTUBE_COOKIES }}" > "$COOKIE_FILE"
-
 # Get video metadata
 METADATA=$(python3 -m yt_dlp --cookies "$COOKIE_FILE" --skip-download --dump-json "$URL" 2>/dev/null)
 
@@ -149,7 +151,6 @@ if [ "$REQUESTED_QUALITY" = "audio" ]; then
         --ignore-errors --no-abort-on-error \
         --output "$FINAL_FILENAME" "$URL"
     
-    rm -f "$COOKIE_FILE"
     echo "SUCCESS: Audio saved as $FINAL_FILENAME"
     exit 0
 fi
@@ -175,7 +176,6 @@ if [ "$REQUESTED_QUALITY" = "best" ]; then
         --ignore-errors --no-abort-on-error \
         --output "$FINAL_FILENAME" "$URL"
     
-    rm -f "$COOKIE_FILE"
     echo "SUCCESS: Video saved as $FINAL_FILENAME"
     exit 0
 fi
@@ -187,7 +187,6 @@ ACTUAL_QUALITY=$(get_best_available_quality "$REQUESTED_QUALITY")
 
 if [ "$ACTUAL_QUALITY" = "none" ]; then
     echo "ERROR: No available quality found for $URL"
-    rm -f "$COOKIE_FILE"
     exit 1
 fi
 
@@ -216,7 +215,6 @@ python3 -m yt_dlp --cookies "$COOKIE_FILE" \
 
 if [ $? -ne 0 ]; then
     echo "ERROR: Download failed for $URL"
-    rm -f "$COOKIE_FILE"
     exit 1
 fi
 
@@ -233,5 +231,4 @@ else
     echo "SUCCESS: Video saved as $FINAL_FILENAME"
 fi
 
-rm -f "$COOKIE_FILE"
 ls -la
