@@ -1,0 +1,11 @@
+# Cookie files (sensitive data)
+cookies/*.txt
+cookies/*.json
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# IDE files
+.vscode/
+.idea/
