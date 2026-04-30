@@ -22,15 +22,14 @@ QUALITIES=("144" "240" "360" "480" "720" "1080")
 # Quality mapping for yt-dlp height filter
 get_height_filter() {
     case "$1" in
-        "144")  echo "best[height<=144]" ;;
-        "240")  echo "best[height<=240]" ;;
-        "360")  echo "best[height<=360]" ;;
-        "480")  echo "best[height<=480]" ;;
-        "720")  echo "best[height<=720]" ;;
-        "1080") echo "best[height<=1080]" ;;
-        "best") echo "best" ;;
-        "audio") echo "bestaudio" ;;
-        *)      echo "best[height<=480]" ;;
+        "144")  echo "bestvideo[height<=144]+bestaudio/best[height<=144]" ;;
+        "240")  echo "bestvideo[height<=240]+bestaudio/best[height<=240]" ;;
+        "360")  echo "bestvideo[height<=360]+bestaudio/best[height<=360]" ;;
+        "480")  echo "bestvideo[height<=480]+bestaudio/best[height<=480]" ;;
+        "720")  echo "bestvideo[height<=720]+bestaudio/best[height<=720]" ;;
+        "1080") echo "bestvideo[height<=1080]+bestaudio/best[height<=1080]" ;;
+        "best") echo "bestvideo+bestaudio/best" ;;
+        *)      echo "bestvideo+bestaudio/best" ;;
     esac
 }
 
@@ -55,6 +54,12 @@ get_best_available_quality() {
         fi
     done
     
+    # If requested quality is not in list, treat as best
+    if [ $requested_index -eq -1 ]; then
+        echo "best"
+        return 0
+    fi
+    
     # First: try qualities lower than requested (from nearest to lowest)
     if [ $requested_index -gt 0 ]; then
         for ((i=$requested_index-1; i>=0; i--)); do
@@ -75,7 +80,7 @@ get_best_available_quality() {
         done
     fi
     
-    # Finally: try the requested quality itself (maybe it works directly)
+    # Finally: try the requested quality itself
     if check_format "$requested"; then
         echo "$requested"
         return 0
@@ -121,9 +126,12 @@ fi
 if [ -z "$TITLE" ]; then
     TITLE="unknown_title"
 fi
+# Keep Persian characters, replace others
 TITLE=$(echo "$TITLE" | sed 's/[^a-zA-Z0-9_\u0600-\u06FF -]//g' | sed 's/[_ ]\+/_/g')
 
-# Handle special case: audio only
+# ============================================
+# Handle audio only
+# ============================================
 if [ "$REQUESTED_QUALITY" = "audio" ]; then
     BASE_FILENAME="${UPLOADER} - ${TITLE} [AUDIO]"
     FINAL_FILENAME="${BASE_FILENAME}.mp3"
@@ -146,7 +154,9 @@ if [ "$REQUESTED_QUALITY" = "audio" ]; then
     exit 0
 fi
 
-# Handle special case: best quality
+# ============================================
+# Handle best quality
+# ============================================
 if [ "$REQUESTED_QUALITY" = "best" ]; then
     BASE_FILENAME="${UPLOADER} - ${TITLE} [BEST]"
     FINAL_FILENAME="${BASE_FILENAME}.mp4"
@@ -170,8 +180,9 @@ if [ "$REQUESTED_QUALITY" = "best" ]; then
     exit 0
 fi
 
+# ============================================
 # Handle regular quality request with fallback
-REQUESTED_HEIGHT=$(get_height_filter "$REQUESTED_QUALITY")
+# ============================================
 ACTUAL_QUALITY=$(get_best_available_quality "$REQUESTED_QUALITY")
 
 if [ "$ACTUAL_QUALITY" = "none" ]; then
@@ -181,7 +192,7 @@ if [ "$ACTUAL_QUALITY" = "none" ]; then
 fi
 
 if [ "$ACTUAL_QUALITY" != "$REQUESTED_QUALITY" ]; then
-    echo "WARNING: Requested quality $REQUESTED_QUALITY not available. Using $ACTUAL_QUALITY instead."
+    echo "WARNING: Requested quality $REQUESTED_QUALITY not available. Using ${ACTUAL_QUALITY}p instead."
 fi
 
 ACTUAL_HEIGHT=$(get_height_filter "$ACTUAL_QUALITY")
@@ -196,7 +207,7 @@ done
 
 # Download video
 python3 -m yt_dlp --cookies "$COOKIE_FILE" \
-    --format "$ACTUAL_HEIGHT" \
+    --format "$ACTUAL_HEIGHT" --merge-output-format mp4 \
     --embed-thumbnail --convert-thumbnails jpg \
     --retries 10 --fragment-retries 10 --retry-sleep exp=1:60 \
     --sleep-interval 3 --max-sleep-interval 10 --limit-rate 500K \
