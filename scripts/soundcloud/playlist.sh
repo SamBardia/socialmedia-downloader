@@ -80,48 +80,46 @@ python3 -m yt_dlp --extract-audio --audio-format "$AUDIO_FORMAT" \
   --output "%(artist)s - %(track)s.%(ext)s" \
   "$URL"
 
+# Check if download was successful
 if [ $? -ne 0 ]; then
     echo "Download failed"
     exit 1
 fi
 
-# Clean up filenames inside temp directory
-for file in *; do
-    if [ -f "$file" ]; then
-        clean_name=$(echo "$file" | sed 's/[\/\\:*?"<>|]/_/g' | sed 's/[[:space:]]/_/g' | sed 's/__*/_/g')
-        if [ "$file" != "$clean_name" ]; then
-            mv "$file" "$clean_name" 2>/dev/null || true
-        fi
-    fi
-done
-
-# Remove any leftover temp files
-rm -f *.webp 2>/dev/null
-rm -f *.jpg.* 2>/dev/null
-
 # Go back to download directory
 cd ..
 
-# Create ZIP archive
-if [ -d "$TEMP_DIR" ] && [ "$(ls -A $TEMP_DIR)" ]; then
-    TOTAL_SIZE=$(du -sb "$TEMP_DIR" | cut -f1)
-    MAX_SIZE_BYTES=$((MAX_ZIP_SIZE_MB * 1024 * 1024))
+# Check if temp directory has any files
+FILE_COUNT=$(find "$TEMP_DIR" -type f -name "*.mp3" 2>/dev/null | wc -l)
+echo "Found $FILE_COUNT MP3 files in temp directory"
 
-    echo "Creating ZIP archive: $FINAL_ZIP_NAME"
-
-    if [ "$SPLIT_LARGE_FILES" = "true" ] && [ "$TOTAL_SIZE" -gt "$MAX_SIZE_BYTES" ]; then
-        echo "Total size exceeds ${MAX_ZIP_SIZE_MB}MB, splitting ZIP into parts"
-        zip -s "${MAX_ZIP_SIZE_MB}m" -r "$FINAL_ZIP_NAME" "$TEMP_DIR"
-    else
-        zip -r "$FINAL_ZIP_NAME" "$TEMP_DIR"
-    fi
-    
-    rm -rf "$TEMP_DIR"
-    
-    echo "✅ Playlist download completed: $FINAL_ZIP_NAME"
-    ls -la "${FINAL_ZIP_NAME}"*
-else
-    echo "No files downloaded for playlist"
+if [ "$FILE_COUNT" -eq 0 ]; then
+    echo "No MP3 files were downloaded"
     rm -rf "$TEMP_DIR"
     exit 1
 fi
+
+# Create ZIP archive
+TOTAL_SIZE=$(du -sb "$TEMP_DIR" | cut -f1)
+MAX_SIZE_BYTES=$((MAX_ZIP_SIZE_MB * 1024 * 1024))
+
+echo "Creating ZIP archive: $FINAL_ZIP_NAME"
+
+if [ "$SPLIT_LARGE_FILES" = "true" ] && [ "$TOTAL_SIZE" -gt "$MAX_SIZE_BYTES" ]; then
+    echo "Total size exceeds ${MAX_ZIP_SIZE_MB}MB, splitting ZIP into parts"
+    zip -s "${MAX_ZIP_SIZE_MB}m" -r "$FINAL_ZIP_NAME" "$TEMP_DIR"
+else
+    zip -r "$FINAL_ZIP_NAME" "$TEMP_DIR"
+fi
+
+# Check if ZIP was created successfully
+if [ -f "$FINAL_ZIP_NAME" ] || [ -f "${FINAL_ZIP_NAME%.zip}.z01" ]; then
+    echo "✅ Playlist download completed: $FINAL_ZIP_NAME"
+    ls -la "${FINAL_ZIP_NAME}"* 2>/dev/null || ls -la "${FINAL_ZIP_NAME%.zip}".z* 2>/dev/null
+else
+    echo "ZIP creation failed"
+    exit 1
+fi
+
+# Clean up
+rm -rf "$TEMP_DIR"
