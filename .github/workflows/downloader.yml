@@ -1,0 +1,52 @@
+name: Universal Downloader
+
+on:
+  push:
+    branches: [ "main" ]
+  workflow_dispatch:
+
+jobs:
+  check-platforms:
+    runs-on: ubuntu-latest
+    outputs:
+      run_soundcloud: ${{ steps.check.outputs.run_soundcloud }}
+      run_twitter: ${{ steps.check.outputs.run_twitter }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Get commit message
+        id: message
+        run: |
+          echo "msg<<EOF" >> $GITHUB_OUTPUT
+          git log -1 --pretty=%B >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+
+      - name: Check which platforms have links
+        id: check
+        run: |
+          MSG="${{ steps.message.outputs.msg }}"
+          
+          if echo "$MSG" | grep -q 'sc:'; then
+            echo "run_soundcloud=true" >> $GITHUB_OUTPUT
+          else
+            echo "run_soundcloud=false" >> $GITHUB_OUTPUT
+          fi
+          
+          if echo "$MSG" | grep -q 'tw:'; then
+            echo "run_twitter=true" >> $GITHUB_OUTPUT
+          else
+            echo "run_twitter=false" >> $GITHUB_OUTPUT
+          fi
+
+  trigger-soundcloud:
+    needs: check-platforms
+    if: needs.check-platforms.outputs.run_soundcloud == 'true'
+    uses: ./.github/workflows/soundcloud.yml
+    secrets: inherit
+
+  trigger-twitter:
+    needs: check-platforms
+    if: needs.check-platforms.outputs.run_twitter == 'true'
+    uses: ./.github/workflows/twitter.yml
+    secrets: inherit
