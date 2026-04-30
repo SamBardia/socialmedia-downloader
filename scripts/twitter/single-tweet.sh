@@ -1,8 +1,8 @@
 #!/bin/bash
 
 # ============================================
-# Twitter Single Tweet Downloader (Final)
-# Full Persian/Unicode support + Time + Stats
+# Twitter Single Tweet Downloader (Final with duplicate handling)
+# Full Persian/Unicode support + Time + Stats + Numbering
 # ============================================
 
 if [ -f "config/twitter.conf" ]; then
@@ -20,14 +20,14 @@ cd "$DOWNLOAD_PATH"
 
 METADATA=$(python3 -m yt_dlp --skip-download --dump-json "$URL" 2>/dev/null)
 
-# Extract username (channel/uploader_id) - clean version
+# Extract username
 USERNAME=$(echo "$METADATA" | jq -r '.channel // .uploader_id // empty')
 if [ -z "$USERNAME" ]; then
     USERNAME=$(echo "$METADATA" | jq -r '.uploader // empty' | sed 's/[^a-zA-Z0-9_]//g')
 fi
 USERNAME=$(echo "$USERNAME" | tr '[:upper:]' '[:lower:]')
 
-# Extract full timestamp (date + time)
+# Extract full timestamp
 TIMESTAMP=$(echo "$METADATA" | jq -r '.timestamp // empty')
 if [ -n "$TIMESTAMP" ] && [ "$TIMESTAMP" != "null" ]; then
     TWEET_DATE=$(date -d "@$TIMESTAMP" +'%Y-%m-%d' 2>/dev/null)
@@ -43,36 +43,44 @@ if [ -z "$TWEET_ID" ]; then
     TWEET_ID=$(echo "$METADATA" | jq -r '.id // empty')
 fi
 
-# Extract description with Persian/Unicode support
+# Extract description
 DESCRIPTION=$(echo "$METADATA" | jq -r '.description // .title // empty')
-
-# If description is still empty or has encoding issues, try alternative
 if [ -z "$DESCRIPTION" ] || [[ "$DESCRIPTION" == *"\\u"* ]]; then
     DESCRIPTION=$(echo "$METADATA" | jq -r '.title // empty')
 fi
 
-# Extract stats (with fallbacks for fields that might be missing)
+# Extract stats
 VIEWS=$(echo "$METADATA" | jq -r '.view_count // .views // empty')
 LIKES=$(echo "$METADATA" | jq -r '.like_count // .favorite_count // empty')
 RETWEETS=$(echo "$METADATA" | jq -r '.retweet_count // .retweets // empty')
 REPLIES=$(echo "$METADATA" | jq -r '.reply_count // .replies // empty')
 
-# If any stat is "null" or empty, set to "N/A"
 [ -z "$VIEWS" ] || [ "$VIEWS" = "null" ] && VIEWS="N/A"
 [ -z "$LIKES" ] || [ "$LIKES" = "null" ] && LIKES="N/A"
 [ -z "$RETWEETS" ] || [ "$RETWEETS" = "null" ] && RETWEETS="N/A"
 [ -z "$REPLIES" ] || [ "$REPLIES" = "null" ] && REPLIES="N/A"
 
+# Base filename without number
 BASE_FILENAME="${USERNAME} - ${TWEET_DATE} - ${TWEET_ID}"
 
-TEMP_DIR="${BASE_FILENAME}"
+# Check for duplicate and add number if needed
+FINAL_ZIP_NAME="${BASE_FILENAME}.zip"
+COUNTER=1
+while [ -f "$FINAL_ZIP_NAME" ]; do
+    FINAL_ZIP_NAME="${BASE_FILENAME}(${COUNTER}).zip"
+    COUNTER=$((COUNTER + 1))
+done
+
+# Extract the base name without .zip for temp folder
+TEMP_DIR="${FINAL_ZIP_NAME%.zip}"
+
 mkdir -p "$TEMP_DIR"
 cd "$TEMP_DIR"
 
-# Save description with UTF-8 encoding (Persian-safe)
-printf '%s\n' "$DESCRIPTION" > "${BASE_FILENAME}.txt"
+# Save description
+printf '%s\n' "$DESCRIPTION" > "${TEMP_DIR}.txt"
 
-# Save info with time and stats
+# Save info
 {
     printf 'Tweet ID: %s\n' "$TWEET_ID"
     printf 'Author: %s\n' "$USERNAME"
@@ -84,7 +92,7 @@ printf '%s\n' "$DESCRIPTION" > "${BASE_FILENAME}.txt"
     printf 'Likes: %s\n' "$LIKES"
     printf 'Retweets: %s\n' "$RETWEETS"
     printf 'Replies: %s\n' "$REPLIES"
-} > "${BASE_FILENAME}(info).txt"
+} > "${TEMP_DIR}(info).txt"
 
 # Download media
 python3 -m yt_dlp \
@@ -93,7 +101,7 @@ python3 -m yt_dlp \
     --ignore-errors \
     --no-abort-on-error \
     --restrict-filenames \
-    --output "${BASE_FILENAME} - %(playlist_index)02d.%(ext)s" \
+    --output "${TEMP_DIR} - %(playlist_index)02d.%(ext)s" \
     "$URL" 2>/dev/null
 
 # Fix any 'NA' filenames
@@ -105,14 +113,14 @@ for file in *NA*; do
 done
 
 # Ensure correct numbering for media files
-COUNTER=1
+MEDIA_COUNTER=1
 for file in $(ls -1 *.mp4 *.jpg *.png *.jpeg *.webm 2>/dev/null | sort); do
     ext="${file##*.}"
-    new_name="${BASE_FILENAME} - ${COUNTER}.${ext}"
+    new_name="${TEMP_DIR} - ${MEDIA_COUNTER}.${ext}"
     if [ "$file" != "$new_name" ]; then
         mv "$file" "$new_name" 2>/dev/null
     fi
-    COUNTER=$((COUNTER + 1))
+    MEDIA_COUNTER=$((MEDIA_COUNTER + 1))
 done
 
 cd ..
@@ -122,12 +130,12 @@ TOTAL_SIZE=$(du -sb "$TEMP_DIR" | cut -f1)
 MAX_SIZE_BYTES=$((MAX_ZIP_SIZE_MB * 1024 * 1024))
 
 if [ "$SPLIT_LARGE_FILES" = "true" ] && [ "$TOTAL_SIZE" -gt "$MAX_SIZE_BYTES" ]; then
-    zip -s "${MAX_ZIP_SIZE_MB}m" -r "${BASE_FILENAME}.zip" "$TEMP_DIR"
+    zip -s "${MAX_ZIP_SIZE_MB}m" -r "$FINAL_ZIP_NAME" "$TEMP_DIR"
 else
-    zip -r "${BASE_FILENAME}.zip" "$TEMP_DIR"
+    zip -r "$FINAL_ZIP_NAME" "$TEMP_DIR"
 fi
 
 rm -rf "$TEMP_DIR"
 
-echo "SUCCESS: Tweet saved as ${BASE_FILENAME}.zip"
-ls -la "${BASE_FILENAME}.zip"*
+echo "SUCCESS: Tweet saved as $FINAL_ZIP_NAME"
+ls -la "$FINAL_ZIP_NAME"*
