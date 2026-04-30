@@ -1,5 +1,9 @@
 #!/bin/bash
 
+# ============================================
+# SoundCloud Single Track Downloader
+# ============================================
+
 # Load configuration file
 if [ -f "config/soundcloud.conf" ]; then
     source "config/soundcloud.conf"
@@ -25,10 +29,14 @@ if [ -z "$ARTIST" ]; then
     ARTIST=$(echo "$METADATA" | grep -oP '"uploader":\s*"\K[^"]+' | head -1)
 fi
 
-# Clean artist name: replace special characters and spaces
-ARTIST=$(echo "$ARTIST" | sed 's/[\/\\:*?"<>|]/_/g' | sed 's/[[:space:]]/_/g' | sed 's/__*/_/g' | sed 's/^_//;s/_$//')
+# STEP 1: Replace unicode fullwidth comma with regular comma
 ARTIST=$(echo "$ARTIST" | sed 's/\\uff0c/,/g' | sed 's/،/,/g')
+
+# STEP 2: Replace commas with " & " (space-ampersand-space)
 ARTIST=$(echo "$ARTIST" | sed 's/[[:space:]]*,[[:space:]]*/ \& /g')
+
+# STEP 3: Clean artist name (remove invalid chars, replace spaces with underscore)
+ARTIST=$(echo "$ARTIST" | sed 's/[\/\\:*?"<>|]/_/g' | sed 's/[[:space:]]/_/g' | sed 's/__*/_/g' | sed 's/^_//;s/_$//')
 
 # Extract track title
 TITLE=$(echo "$METADATA" | grep -oP '"track":\s*"\K[^"]+' | head -1)
@@ -56,6 +64,8 @@ while [ -f "$FINAL_FILENAME" ]; do
     FINAL_FILENAME="${BASE_FILENAME}(${COUNTER}).${EXTENSION}"
     COUNTER=$((COUNTER + 1))
 done
+
+echo "Downloading: $FINAL_FILENAME"
 
 # Download track with cover art and retry logic
 python3 -m yt_dlp --extract-audio --audio-format "$AUDIO_FORMAT" \
