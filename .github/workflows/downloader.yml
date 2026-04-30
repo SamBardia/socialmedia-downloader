@@ -19,65 +19,21 @@ jobs:
           git log -1 --pretty=%B >> $GITHUB_OUTPUT
           echo "EOF" >> $GITHUB_OUTPUT
 
-      - name: Extract links by platform
+      - name: Extract SoundCloud links
         id: extract
         run: |
           MSG="${{ steps.message.outputs.msg }}"
-          echo "$MSG" | grep -oP 'sc:\s*https?://[^\s]+' > sc_urls.txt || true
-          echo "$MSG" | grep -oP 'ig:\s*https?://[^\s]+' > ig_urls.txt || true
-          echo "$MSG" | grep -oP 'tt:\s*https?://[^\s]+' > tt_urls.txt || true
-          echo "$MSG" | grep -oP 'tw:\s*https?://[^\s]+' > tw_urls.txt || true
-          
-          echo "SC: $(wc -l < sc_urls.txt)"
-          echo "IG: $(wc -l < ig_urls.txt)"
-          echo "TT: $(wc -l < tt_urls.txt)"
-          echo "TW: $(wc -l < tw_urls.txt)"
+          echo "$MSG" | grep -oP 'sc:\s*https?://[^\s]+' | sed 's/^sc:\s*//' > sc_urls.txt
+          echo "Found $(wc -l < sc_urls.txt) SoundCloud link(s)"
 
-      - name: Setup dependencies (shared cache)
+      - name: Dispatch to SoundCloud platform
         run: |
-          sudo apt-get update
-          sudo apt-get install -y ffmpeg zip jq
-          pip install yt-dlp
-
-      - name: Dispatch to SoundCloud
-        run: |
-          while IFS= read -r line; do
-            URL=$(echo "$line" | sed 's/^sc:\s*//')
+          while IFS= read -r URL; do
             if [[ -n "$URL" ]]; then
-              echo "Dispatching to SoundCloud: $URL"
+              echo "Dispatching: $URL"
               gh workflow run platforms/soundcloud.yml -f url="$URL"
+              sleep 2
             fi
           done < sc_urls.txt
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Dispatch to Instagram
-        run: |
-          while IFS= read -r line; do
-            URL=$(echo "$line" | sed 's/^ig:\s*//')
-            if [[ -n "$URL" ]]; then
-              echo "Dispatching to Instagram: $URL"
-              # gh workflow run platforms/instagram.yml -f url="$URL"
-              echo "Instagram workflow not yet implemented"
-            fi
-          done < ig_urls.txt
-
-      - name: Dispatch to TikTok
-        run: |
-          while IFS= read -r line; do
-            URL=$(echo "$line" | sed 's/^tt:\s*//')
-            if [[ -n "$URL" ]]; then
-              echo "Dispatching to TikTok: $URL"
-              echo "TikTok workflow not yet implemented"
-            fi
-          done < tt_urls.txt
-
-      - name: Dispatch to Twitter
-        run: |
-          while IFS= read -r line; do
-            URL=$(echo "$line" | sed 's/^tw:\s*//')
-            if [[ -n "$URL" ]]; then
-              echo "Dispatching to Twitter: $URL"
-              echo "Twitter workflow not yet implemented"
-            fi
-          done < tw_urls.txt
