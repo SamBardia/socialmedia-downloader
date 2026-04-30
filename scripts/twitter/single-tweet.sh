@@ -20,14 +20,28 @@ cd "$DOWNLOAD_PATH"
 
 METADATA=$(python3 -m yt_dlp --skip-download --dump-json "$URL" 2>/dev/null)
 
-# Extract username (channel/uploader_id) - clean version
+# ============================================
+# Extract username with multiple fallbacks
+# ============================================
 USERNAME=$(echo "$METADATA" | jq -r '.channel // .uploader_id // empty')
 if [ -z "$USERNAME" ]; then
-    USERNAME=$(echo "$METADATA" | jq -r '.uploader // empty' | sed 's/[^a-zA-Z0-9_]//g')
+    USERNAME=$(echo "$METADATA" | jq -r '.uploader // empty')
+    # Remove emojis and special chars from display name
+    USERNAME=$(echo "$USERNAME" | perl -CSD -pe 's/[^\w\s\-]//g' 2>/dev/null || echo "$USERNAME" | sed 's/[^a-zA-Z0-9 ]//g')
+    USERNAME=$(echo "$USERNAME" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')
+    USERNAME=$(echo "$USERNAME" | sed 's/[[:space:]]\+/_/g')
+fi
+if [ -z "$USERNAME" ]; then
+    USERNAME=$(echo "$METADATA" | jq -r '.display_id // empty')
+fi
+if [ -z "$USERNAME" ]; then
+    USERNAME="unknown_user"
 fi
 USERNAME=$(echo "$USERNAME" | tr '[:upper:]' '[:lower:]')
 
+# ============================================
 # Extract full timestamp
+# ============================================
 TIMESTAMP=$(echo "$METADATA" | jq -r '.timestamp // empty')
 if [ -n "$TIMESTAMP" ] && [ "$TIMESTAMP" != "null" ]; then
     TWEET_DATE=$(date -d "@$TIMESTAMP" +'%Y-%m-%d' 2>/dev/null)
@@ -37,7 +51,9 @@ else
     TWEET_TIME=$(date +'%H:%M:%S')
 fi
 
+# ============================================
 # Extract tweet ID
+# ============================================
 TWEET_ID=$(echo "$URL" | grep -oP 'status/\K[0-9]+')
 if [ -z "$TWEET_ID" ]; then
     TWEET_ID=$(echo "$METADATA" | jq -r '.id // empty')
