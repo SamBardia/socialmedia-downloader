@@ -1,7 +1,8 @@
 #!/bin/bash
 
 # ============================================
-# SoundCloud Album Downloader
+# SoundCloud Collection Downloader (Album & Playlist)
+# Always numbers tracks, no distinction between album and playlist
 # ============================================
 
 # Load configuration file
@@ -18,52 +19,52 @@ SPLIT_LARGE_FILES="${SPLIT_LARGE_FILES:-true}"
 # Get URL from first argument
 URL="$1"
 
-# Extract album name from URL (everything after /sets/)
-ALBUM_NAME=$(echo "$URL" | sed -n 's|.*/sets/\([^/?]*\).*|\1|p' | sed 's/^./\U&/')
-if [ -z "$ALBUM_NAME" ]; then
-    echo "ERROR: Could not extract album name from URL"
+# Extract collection name from URL
+COLLECTION_NAME=$(echo "$URL" | sed -n 's|.*/sets/\([^/?]*\).*|\1|p')
+if [ -z "$COLLECTION_NAME" ]; then
+    COLLECTION_NAME=$(echo "$URL" | sed -n 's|.*/playlists/\([^/?]*\).*|\1|p')
+fi
+
+if [ -z "$COLLECTION_NAME" ]; then
+    echo "ERROR: Could not extract collection name from URL"
     exit 1
 fi
 
-# Check if album name contains Persian characters
-if echo "$ALBUM_NAME" | grep -qP '[\x{0600}-\x{06FF}]'; then
-    ALBUM_NAME="Album"
-fi
-
-# Clean album name
-ALBUM_NAME=$(echo "$ALBUM_NAME" | sed 's/[\/\\:*?"<>|]/_/g' | sed 's/[[:space:]]/_/g' | sed 's/__*/_/g' | sed 's/^_//;s/_$//')
-echo "Album: $ALBUM_NAME"
+# Clean collection name (remove invalid chars ONLY, keep spaces)
+COLLECTION_NAME=$(echo "$COLLECTION_NAME" | sed 's/[\/\\:*?"<>|]/_/g')
+COLLECTION_NAME=$(echo "$COLLECTION_NAME" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')
+echo "Collection: $COLLECTION_NAME"
 
 # Create download directory
 mkdir -p "$DOWNLOAD_PATH"
 cd "$DOWNLOAD_PATH"
 
 # Find unique ZIP filename
-BASE_ZIP_NAME="${ALBUM_NAME}.zip"
+BASE_ZIP_NAME="${COLLECTION_NAME}.zip"
 FINAL_ZIP_NAME="$BASE_ZIP_NAME"
 COUNTER=1
 while [ -f "$FINAL_ZIP_NAME" ]; do
-    FINAL_ZIP_NAME="${ALBUM_NAME}(${COUNTER}).zip"
+    FINAL_ZIP_NAME="${COLLECTION_NAME}(${COUNTER}).zip"
     COUNTER=$((COUNTER + 1))
 done
 
 echo "ZIP file will be: $FINAL_ZIP_NAME"
 
-# Create temporary directory for album
-TEMP_DIR="temp_${ALBUM_NAME}"
+# Create temporary directory
+TEMP_DIR="temp_${COLLECTION_NAME}"
 mkdir -p "$TEMP_DIR"
 cd "$TEMP_DIR"
 
-# Download album cover thumbnail
-echo "Downloading album cover..."
+# Download album cover thumbnail (best effort)
+echo "Downloading cover art..."
 python3 -m yt_dlp --skip-download --write-thumbnail --convert-thumbnails jpg \
   --retries 10 \
   --retry-sleep exp=1:60 \
-  --output "${ALBUM_NAME} - Pic" \
+  --output "${COLLECTION_NAME} - Pic" \
   "$URL" 2>/dev/null
 
-# Download all tracks with track numbers
-echo "Downloading album tracks..."
+# Download all tracks with track numbers (always 2 digits)
+echo "Downloading tracks..."
 python3 -m yt_dlp --extract-audio --audio-format "$AUDIO_FORMAT" \
   --embed-thumbnail --convert-thumbnails jpg \
   --retries 10 \
@@ -103,5 +104,5 @@ fi
 # Clean up
 rm -rf "$TEMP_DIR"
 
-echo "SUCCESS: Album download completed - $FINAL_ZIP_NAME"
+echo "SUCCESS: Collection download completed - $FINAL_ZIP_NAME"
 ls -la "${FINAL_ZIP_NAME}"*
