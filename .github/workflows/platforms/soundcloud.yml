@@ -6,9 +6,6 @@ on:
       url:
         required: true
         type: string
-      type:
-        required: true
-        type: string
 
 jobs:
   download:
@@ -19,26 +16,73 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Install dependencies
+      - name: Get URL
+        id: url
         run: |
-          sudo apt-get update
-          sudo apt-get install -y ffmpeg zip
-          pip install yt-dlp
+          URL="${{ inputs.url }}"
+          echo "url=$URL" >> $GITHUB_OUTPUT
+          echo "Processing: $URL"
+
+      - name: Detect content type
+        id: detect
+        run: |
+          URL="${{ steps.url.outputs.url }}"
+          
+          # Check if it's an album (contains /sets/ and we can detect playlist vs album)
+          # For now, use a simple heuristic:
+          # - If URL contains /sets/ and also contains a numeric ID pattern, it's likely a playlist
+          # - Otherwise, treat as single track or album
+          
+          if [[ "$URL" == *"/sets/"* ]]; then
+            # Try to get info to distinguish album from playlist
+            INFO=$(python3 -m yt_dlp --skip-download --dump-json "$URL" 2>/dev/null)
+            PLAYLIST_TITLE=$(echo "$INFO" | jq -r '.playlist_title // empty')
+            UPLOADER=$(echo "$INFO" | jq -r '.uploader // empty')
+            
+            # If playlist_title contains Persian characters or is long, it's likely a playlist
+            if echo "$PLAYLIST_TITLE" | grep -qP '[\x{0600}-\x{06FF}]'; then
+              echo "type=playlist" >> $GITHUB_OUTPUT
+            elif [[ -n "$PLAYLIST_TITLE" && "$PLAYLIST_TITLE" != "$UPLOADER" ]]; then
+              echo "type=playlist" >> $GITHUB_OUTPUT
+            else
+              echo "type=album" >> $GITHUB_OUTPUT
+            fi
+          elif [[ "$URL" =~ ^https://soundcloud\.com/[^/]+/[^/]+$ ]]; then
+            echo "type=single" >> $GITHUB_OUTPUT
+          else
+            echo "type=playlist" >> $GITHUB_OUTPUT
+          fi
+          
+          echo "Detected type: $(cat $GITHUB_OUTPUT | grep type | cut -d= -f2)"
 
       - name: Run script
         run: |
-          if [[ "${{ inputs.type }}" == "single" ]]; then
-            chmod +x scripts/soundcloud/single.sh
-            ./scripts/soundcloud/single.sh "${{ inputs.url }}"
-          else
-            chmod +x scripts/soundcloud/album.sh
-            ./scripts/soundcloud/album.sh "${{ inputs.url }}"
-          fi
+          URL="${{ steps.url.outputs.url }}"
+          TYPE="${{ steps.detect.outputs.type }}"
+          
+          chmod +x scripts/soundcloud/single.sh 2>/dev/null || true
+          chmod +x scripts/soundcloud/album.sh 2>/dev/null || true
+          chmod +x scripts/soundcloud/playlist.sh 2>/dev/null || true
+          
+          case "$TYPE" in
+            "single")
+              echo "Running single.sh for: $URL"
+              ./scripts/soundcloud/single.sh "$URL"
+              ;;
+            "album")
+              echo "Running album.sh for: $URL"
+              ./scripts/soundcloud/album.sh "$URL"
+              ;;
+            "playlist")
+              echo "Running playlist.sh for: $URL"
+              ./scripts/soundcloud/playlist.sh "$URL"
+              ;;
+          esac
 
-      - name: Push changes
+      - name: Push to repository
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add downloads/soundcloud/
-          git commit -m "Add SoundCloud content [skip ci]" || echo "No changes"
+          git commit -m "Add SoundCloud content [skip ci]" || echo "No changes to commit"
           git push
