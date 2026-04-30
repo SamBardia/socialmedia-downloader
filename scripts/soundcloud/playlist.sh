@@ -39,7 +39,7 @@ echo "Playlist: $PLAYLIST_NAME"
 mkdir -p "$DOWNLOAD_PATH"
 cd "$DOWNLOAD_PATH"
 
-# Find unique ZIP filename (add number if exists)
+# Find unique ZIP filename
 BASE_ZIP_NAME="${PLAYLIST_NAME}.zip"
 FINAL_ZIP_NAME="$BASE_ZIP_NAME"
 COUNTER=1
@@ -47,6 +47,8 @@ while [ -f "$FINAL_ZIP_NAME" ]; do
     FINAL_ZIP_NAME="${PLAYLIST_NAME}(${COUNTER}).zip"
     COUNTER=$((COUNTER + 1))
 done
+
+echo "ZIP file will be: $FINAL_ZIP_NAME"
 
 # Download all tracks WITHOUT track numbers
 echo "Downloading playlist tracks..."
