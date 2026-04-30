@@ -25,6 +25,11 @@ if [ -z "$ALBUM_NAME" ]; then
     exit 1
 fi
 
+# Check if album name contains Persian characters
+if echo "$ALBUM_NAME" | grep -qP '[\x{0600}-\x{06FF}]'; then
+    ALBUM_NAME="Album"
+fi
+
 # Clean album name
 ALBUM_NAME=$(echo "$ALBUM_NAME" | sed 's/[\/\\:*?"<>|]/_/g' | sed 's/[[:space:]]/_/g' | sed 's/__*/_/g' | sed 's/^_//;s/_$//')
 echo "Album: $ALBUM_NAME"
@@ -33,7 +38,7 @@ echo "Album: $ALBUM_NAME"
 mkdir -p "$DOWNLOAD_PATH"
 cd "$DOWNLOAD_PATH"
 
-# Find unique ZIP filename (add number if exists)
+# Find unique ZIP filename
 BASE_ZIP_NAME="${ALBUM_NAME}.zip"
 FINAL_ZIP_NAME="$BASE_ZIP_NAME"
 COUNTER=1
@@ -41,6 +46,8 @@ while [ -f "$FINAL_ZIP_NAME" ]; do
     FINAL_ZIP_NAME="${ALBUM_NAME}(${COUNTER}).zip"
     COUNTER=$((COUNTER + 1))
 done
+
+echo "ZIP file will be: $FINAL_ZIP_NAME"
 
 # Create temporary directory for album
 TEMP_DIR="temp_${ALBUM_NAME}"
