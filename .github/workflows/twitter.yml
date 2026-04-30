@@ -14,9 +14,6 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      # ============================================
-      # Get the commit message
-      # ============================================
       - name: Get commit message
         id: message
         run: |
@@ -24,9 +21,6 @@ jobs:
           git log -1 --pretty=%B >> $GITHUB_OUTPUT
           echo "EOF" >> $GITHUB_OUTPUT
 
-      # ============================================
-      # Extract all Twitter URLs from commit message
-      # ============================================
       - name: Extract all Twitter URLs
         id: extract
         run: |
@@ -37,72 +31,34 @@ jobs:
             echo "$URLS" >> $GITHUB_OUTPUT
             echo "EOF" >> $GITHUB_OUTPUT
             echo "found=true" >> $GITHUB_OUTPUT
-            echo "count=$(echo "$URLS" | wc -l)" >> $GITHUB_OUTPUT
           else
             echo "found=false" >> $GITHUB_OUTPUT
           fi
 
-      # ============================================
-      # Find fastest Ubuntu mirror
-      # ============================================
-      - name: Find fastest Ubuntu mirror
-        if: steps.extract.outputs.found == 'true'
-        id: mirror
-        run: |
-          sudo sed -i 's|azure.archive.ubuntu.com/ubuntu|archive.ubuntu.com/ubuntu|g' /etc/apt/sources.list
-          sudo apt-get update
-
-      # ============================================
-      # Install dependencies (with jq for JSON parsing)
-      # ============================================
       - name: Install dependencies
         if: steps.extract.outputs.found == 'true'
         run: |
+          sudo apt-get update
           sudo apt-get install -y --no-install-recommends ffmpeg zip jq
           pip install --no-deps yt-dlp
           pip install brotlicffi
 
-      # ============================================
-      # Process all Twitter URLs
-      # ============================================
       - name: Process all Twitter URLs
         if: steps.extract.outputs.found == 'true'
         run: |
           chmod +x scripts/twitter/single-tweet.sh
-          
           echo "${{ steps.extract.outputs.urls }}" | while read -r URL; do
             [ -z "$URL" ] && continue
-            
-            echo ""
-            echo "========================================="
             echo "Processing: $URL"
-            echo "========================================="
-            
             ./scripts/twitter/single-tweet.sh "$URL"
-            
-            echo "Completed: $URL"
           done
 
-      # ============================================
-      # Push downloaded files to repository
-      # ============================================
       - name: Push to repository
         if: steps.extract.outputs.found == 'true'
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git pull origin main --rebase || true
-          git add downloads/twitter/
+          git add downloads/
           git commit -m "Add Twitter content [skip ci]" || echo "No changes to commit"
+          git pull --no-rebase origin main || true
           git push
-
-      # ============================================
-      # List downloaded files
-      # ============================================
-      - name: List downloaded files
-        if: steps.extract.outputs.found == 'true'
-        run: |
-          echo "========================================="
-          echo "Files in downloads/twitter/:"
-          echo "========================================="
-          ls -la downloads/twitter/
