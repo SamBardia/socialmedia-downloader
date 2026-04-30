@@ -33,14 +33,24 @@ fi
 # Clean collection name (remove invalid chars ONLY, keep spaces)
 COLLECTION_NAME=$(echo "$COLLECTION_NAME" | sed 's/[\/\\:*?"<>|]/_/g')
 COLLECTION_NAME=$(echo "$COLLECTION_NAME" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')
+
+# Capitalize first letter of collection name
+COLLECTION_NAME="$(echo "${COLLECTION_NAME:0:1}" | tr '[:lower:]' '[:upper:]')${COLLECTION_NAME:1}"
+
+# Add " Album" suffix for folder name
+FOLDER_NAME="${COLLECTION_NAME} Album"
+ZIP_NAME="${COLLECTION_NAME}.zip"
+
 echo "Collection: $COLLECTION_NAME"
+echo "Folder: $FOLDER_NAME"
+echo "ZIP file will be: $ZIP_NAME"
 
 # Create download directory
 mkdir -p "$DOWNLOAD_PATH"
 cd "$DOWNLOAD_PATH"
 
-# Find unique ZIP filename
-BASE_ZIP_NAME="${COLLECTION_NAME}.zip"
+# Find unique ZIP filename (add number if exists)
+BASE_ZIP_NAME="$ZIP_NAME"
 FINAL_ZIP_NAME="$BASE_ZIP_NAME"
 COUNTER=1
 while [ -f "$FINAL_ZIP_NAME" ]; do
@@ -48,10 +58,10 @@ while [ -f "$FINAL_ZIP_NAME" ]; do
     COUNTER=$((COUNTER + 1))
 done
 
-echo "ZIP file will be: $FINAL_ZIP_NAME"
+echo "Final ZIP file: $FINAL_ZIP_NAME"
 
-# Create temporary directory
-TEMP_DIR="temp_${COLLECTION_NAME}"
+# Create temporary directory for collection
+TEMP_DIR="$FOLDER_NAME"
 mkdir -p "$TEMP_DIR"
 cd "$TEMP_DIR"
 
@@ -64,6 +74,7 @@ python3 -m yt_dlp --skip-download --write-thumbnail --convert-thumbnails jpg \
   "$URL" 2>/dev/null
 
 # Download all tracks with track numbers (always 2 digits)
+# --ignore-errors and --no-abort-on-error allow skipping failed tracks
 echo "Downloading tracks..."
 python3 -m yt_dlp --extract-audio --audio-format "$AUDIO_FORMAT" \
   --embed-thumbnail --convert-thumbnails jpg \
@@ -73,13 +84,10 @@ python3 -m yt_dlp --extract-audio --audio-format "$AUDIO_FORMAT" \
   --sleep-interval 3 \
   --max-sleep-interval 10 \
   --limit-rate 500K \
+  --ignore-errors \
+  --no-abort-on-error \
   --output "%(playlist_index)02d - %(artist)s - %(track)s.%(ext)s" \
   "$URL"
-
-if [ $? -ne 0 ]; then
-    echo "ERROR: Download failed"
-    exit 1
-fi
 
 # Clean up temporary files
 rm -f *.webp 2>/dev/null
