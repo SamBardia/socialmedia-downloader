@@ -1,7 +1,8 @@
 #!/bin/bash
 
 # ============================================
-# Twitter Single Tweet Downloader (Final)
+# Twitter Single Tweet Downloader
+# Support for text-only tweets
 # ============================================
 
 if [ -f "config/twitter.conf" ]; then
@@ -18,7 +19,7 @@ mkdir -p "$DOWNLOAD_PATH"
 cd "$DOWNLOAD_PATH"
 
 # ============================================
-# Extract username from URL (most reliable)
+# Extract username from URL
 # ============================================
 USERNAME=$(echo "$URL" | grep -oP 'x\.com/\K[^/]+')
 if [ -z "$USERNAME" ]; then
@@ -38,12 +39,12 @@ if [ -z "$TWEET_ID" ]; then
 fi
 
 # ============================================
-# Get metadata (if available)
+# Get metadata from yt-dlp
 # ============================================
 METADATA=$(python3 -m yt_dlp --skip-download --dump-json "$URL" 2>/dev/null)
 
 # ============================================
-# Extract date from metadata or use current date
+# Extract date
 # ============================================
 TIMESTAMP=$(echo "$METADATA" | jq -r '.timestamp // empty')
 if [ -n "$TIMESTAMP" ] && [ "$TIMESTAMP" != "null" ]; then
@@ -55,24 +56,29 @@ else
 fi
 
 # ============================================
-# Extract description from multiple sources
+# Check if tweet has media
 # ============================================
-DESCRIPTION=$(echo "$METADATA" | jq -r '.description // empty')
-if [ -z "$DESCRIPTION" ]; then
-    DESCRIPTION=$(echo "$METADATA" | jq -r '.title // empty')
-    DESCRIPTION=$(echo "$DESCRIPTION" | sed 's/^X 上的 //' | sed 's/ \/ X$//')
+HAS_MEDIA=false
+MEDIA_INDICATOR=$(echo "$METADATA" | jq -r '.thumbnails // empty | length')
+if [ -n "$MEDIA_INDICATOR" ] && [ "$MEDIA_INDICATOR" -gt 0 ]; then
+    HAS_MEDIA=true
 fi
-if [ -z "$DESCRIPTION" ]; then
-    DESCRIPTION=$(echo "$METADATA" | jq -r '.text // empty')
-fi
-if [ -z "$DESCRIPTION" ]; then
-    DESCRIPTION=$(echo "$METADATA" | jq -r '.content // empty')
-fi
-if [ -z "$DESCRIPTION" ]; then
-    DESCRIPTION=$(echo "$METADATA" | jq -r '.full_text // empty')
-fi
-if [ -z "$DESCRIPTION" ]; then
-    DESCRIPTION="[Tweet content not available - possibly deleted or private]"
+
+# ============================================
+# Build description based on what we know
+# ============================================
+DESCRIPTION=""
+if [ "$HAS_MEDIA" = false ]; then
+    DESCRIPTION="[TEXT-ONLY TWEET] No media attached. yt-dlp cannot extract the text content. Original URL: $URL"
+else
+    DESCRIPTION=$(echo "$METADATA" | jq -r '.description // empty')
+    if [ -z "$DESCRIPTION" ]; then
+        DESCRIPTION=$(echo "$METADATA" | jq -r '.title // empty')
+        DESCRIPTION=$(echo "$DESCRIPTION" | sed 's/^X 上的 //' | sed 's/ \/ X$//')
+    fi
+    if [ -z "$DESCRIPTION" ]; then
+        DESCRIPTION="[Tweet with media] Content not available. URL: $URL"
+    fi
 fi
 
 # ============================================
@@ -106,30 +112,33 @@ printf '%s\n' "$DESCRIPTION" > "${TEMP_DIR}.txt"
     printf 'Date: %s\n' "$TWEET_DATE"
     printf 'Time: %s\n' "$TWEET_TIME"
     printf 'URL: %s\n' "$URL"
+    printf 'Media: %s\n' "$([ "$HAS_MEDIA" = true ] && echo "Yes" || echo "No")"
 } > "${TEMP_DIR}(info).txt"
 
 # ============================================
 # Download media (if any)
 # ============================================
-python3 -m yt_dlp \
-    --retries 5 \
-    --fragment-retries 5 \
-    --ignore-errors \
-    --no-abort-on-error \
-    --restrict-filenames \
-    --output "${TEMP_DIR} - %(playlist_index)02d.%(ext)s" \
-    "$URL" 2>/dev/null
-
-# Rename media files
-MEDIA_COUNTER=1
-for file in $(ls -1 *.mp4 *.jpg *.png *.jpeg *.webm 2>/dev/null | sort); do
-    ext="${file##*.}"
-    new_name="${TEMP_DIR} - ${MEDIA_COUNTER}.${ext}"
-    if [ "$file" != "$new_name" ]; then
-        mv "$file" "$new_name" 2>/dev/null
-    fi
-    MEDIA_COUNTER=$((MEDIA_COUNTER + 1))
-done
+if [ "$HAS_MEDIA" = true ]; then
+    python3 -m yt_dlp \
+        --retries 5 \
+        --fragment-retries 5 \
+        --ignore-errors \
+        --no-abort-on-error \
+        --restrict-filenames \
+        --output "${TEMP_DIR} - %(playlist_index)02d.%(ext)s" \
+        "$URL" 2>/dev/null
+    
+    # Rename media files
+    MEDIA_COUNTER=1
+    for file in $(ls -1 *.mp4 *.jpg *.png *.jpeg *.webm 2>/dev/null | sort); do
+        ext="${file##*.}"
+        new_name="${TEMP_DIR} - ${MEDIA_COUNTER}.${ext}"
+        if [ "$file" != "$new_name" ]; then
+            mv "$file" "$new_name" 2>/dev/null
+        fi
+        MEDIA_COUNTER=$((MEDIA_COUNTER + 1))
+    done
+fi
 
 cd ..
 
