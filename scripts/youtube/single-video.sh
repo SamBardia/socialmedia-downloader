@@ -25,9 +25,69 @@ fi
 # Quality order (low to high)
 QUALITIES=("144" "240" "360" "480" "720" "1080")
 
+# ============================================
+# Helper functions
+# ============================================
+
+# Get video title directly (clean, without extra info)
+get_video_title() {
+    local title
+    title=$(python3 -m yt_dlp --cookies "$COOKIE_FILE" --get-title "$URL" 2>/dev/null)
+    if [ -z "$title" ]; then
+        local metadata
+        metadata=$(python3 -m yt_dlp --cookies "$COOKIE_FILE" --skip-download --dump-json "$URL" 2>/dev/null)
+        title=$(echo "$metadata" | jq -r '.title // .fulltitle // empty')
+    fi
+    if [ -z "$title" ]; then
+        title="unknown_title"
+    fi
+    # Clean title for filename
+    title=$(echo "$title" | sed 's/[\/\\:*?"<>|]/_/g' | sed 's/[[:space:]]\+/_/g' | sed 's/^_//;s/_$//')
+    echo "$title"
+}
+
+# Check if a specific quality is available
+check_quality() {
+    local target_height="$1"
+    local format_filter="bestvideo[height<=${target_height}]+bestaudio/best[height<=${target_height}]"
+    python3 -m yt_dlp --cookies "$COOKIE_FILE" --simulate --format "$format_filter" "$URL" 2>/dev/null
+    return $?
+}
+
+# Get best available quality (lower than requested first, then higher)
+get_best_available_quality() {
+    local requested="$1"
+    local requested_num=$(echo "$requested" | sed 's/p//')
+    
+    # First: try qualities lower than requested (from highest to lowest)
+    for ((i=requested_num-1; i>=144; i--)); do
+        if check_quality "$i"; then
+            echo "${i}p"
+            return 0
+        fi
+    done
+    
+    # Second: try qualities higher than requested (from lowest to highest)
+    for ((i=requested_num+1; i<=1080; i++)); do
+        if check_quality "$i"; then
+            echo "${i}p"
+            return 0
+        fi
+    done
+    
+    # Finally: try the requested quality itself
+    if check_quality "$requested_num"; then
+        echo "${requested_num}p"
+        return 0
+    fi
+    
+    echo "none"
+}
+
 # Quality mapping for yt-dlp height filter
 get_height_filter() {
-    case "$1" in
+    local quality=$(echo "$1" | sed 's/p//')
+    case "$quality" in
         "144")  echo "bestvideo[height<=144]+bestaudio/best[height<=144]" ;;
         "240")  echo "bestvideo[height<=240]+bestaudio/best[height<=240]" ;;
         "360")  echo "bestvideo[height<=360]+bestaudio/best[height<=360]" ;;
@@ -39,62 +99,6 @@ get_height_filter() {
     esac
 }
 
-# Check if format exists
-check_format() {
-    local quality="$1"
-    local height_filter=$(get_height_filter "$quality")
-    python3 -m yt_dlp --cookies "$COOKIE_FILE" --simulate --format "$height_filter" "$URL" 2>/dev/null
-    return $?
-}
-
-# Get best available quality (prioritize lower than requested, then higher)
-get_best_available_quality() {
-    local requested="$1"
-    local requested_index=-1
-    
-    # Find index of requested quality
-    for i in "${!QUALITIES[@]}"; do
-        if [[ "${QUALITIES[$i]}" == "$requested" ]]; then
-            requested_index=$i
-            break
-        fi
-    done
-    
-    # If requested quality is not in list, treat as best
-    if [ $requested_index -eq -1 ]; then
-        echo "best"
-        return 0
-    fi
-    
-    # First: try qualities lower than requested (from nearest to lowest)
-    if [ $requested_index -gt 0 ]; then
-        for ((i=$requested_index-1; i>=0; i--)); do
-            if check_format "${QUALITIES[$i]}"; then
-                echo "${QUALITIES[$i]}"
-                return 0
-            fi
-        done
-    fi
-    
-    # Second: try qualities higher than requested (from nearest to highest)
-    if [ $requested_index -lt $((${#QUALITIES[@]} - 1)) ]; then
-        for ((i=$requested_index+1; i<${#QUALITIES[@]}; i++)); do
-            if check_format "${QUALITIES[$i]}"; then
-                echo "${QUALITIES[$i]}"
-                return 0
-            fi
-        done
-    fi
-    
-    # Finally: try the requested quality itself
-    if check_format "$requested"; then
-        echo "$requested"
-        return 0
-    fi
-    
-    echo "none"
-}
-
 # ============================================
 # Main script
 # ============================================
@@ -102,19 +106,8 @@ get_best_available_quality() {
 mkdir -p "$DOWNLOAD_PATH"
 cd "$DOWNLOAD_PATH"
 
-# Get video metadata
-METADATA=$(python3 -m yt_dlp --cookies "$COOKIE_FILE" --skip-download --dump-json "$URL" 2>/dev/null)
-
-# Extract title (only, no uploader)
-TITLE=$(echo "$METADATA" | jq -r '.title // empty')
-if [ -z "$TITLE" ]; then
-    TITLE=$(echo "$METADATA" | jq -r '.fulltitle // empty')
-fi
-if [ -z "$TITLE" ]; then
-    TITLE="unknown_title"
-fi
-# Keep Persian characters, replace others
-TITLE=$(echo "$TITLE" | sed 's/[^a-zA-Z0-9_\u0600-\u06FF -]//g' | sed 's/[_ ]\+/_/g')
+# Get clean video title
+TITLE=$(get_video_title)
 
 # ============================================
 # Handle audio only
@@ -168,26 +161,36 @@ fi
 # ============================================
 # Handle regular quality request with fallback
 # ============================================
-ACTUAL_QUALITY=$(get_best_available_quality "$REQUESTED_QUALITY")
+# Remove 'p' from requested quality if present
+REQUESTED_CLEAN=$(echo "$REQUESTED_QUALITY" | sed 's/p//')
 
-if [ "$ACTUAL_QUALITY" = "none" ]; then
-    echo "ERROR: No available quality found for $URL"
-    exit 1
+# Check if requested quality is available
+if ! check_quality "$REQUESTED_CLEAN"; then
+    ACTUAL_QUALITY=$(get_best_available_quality "$REQUESTED_CLEAN")
+    if [ "$ACTUAL_QUALITY" = "none" ]; then
+        echo "ERROR: No available quality found for $URL"
+        exit 1
+    fi
+    echo "WARNING: Requested quality ${REQUESTED_CLEAN}p not available. Using $ACTUAL_QUALITY instead."
+    ACTUAL_HEIGHT=$(get_height_filter "$ACTUAL_QUALITY")
+    ACTUAL_CLEAN=$(echo "$ACTUAL_QUALITY" | sed 's/p//')
+    BASE_FILENAME="${TITLE} (${ACTUAL_QUALITY})"
+else
+    BASE_FILENAME="${TITLE} (${REQUESTED_CLEAN}p)"
+    ACTUAL_HEIGHT=$(get_height_filter "${REQUESTED_CLEAN}p")
+    ACTUAL_CLEAN="$REQUESTED_CLEAN"
 fi
 
-if [ "$ACTUAL_QUALITY" != "$REQUESTED_QUALITY" ]; then
-    echo "WARNING: Requested quality $REQUESTED_QUALITY not available. Using ${ACTUAL_QUALITY}p instead."
-fi
-
-ACTUAL_HEIGHT=$(get_height_filter "$ACTUAL_QUALITY")
-BASE_FILENAME="${TITLE} (${ACTUAL_QUALITY}p)"
 FINAL_FILENAME="${BASE_FILENAME}.mp4"
 
+# Handle duplicate files
 COUNTER=1
 while [ -f "$FINAL_FILENAME" ]; do
     FINAL_FILENAME="${BASE_FILENAME}(${COUNTER}).mp4"
     COUNTER=$((COUNTER + 1))
 done
+
+echo "Downloading: $FINAL_FILENAME"
 
 # Download video
 python3 -m yt_dlp --cookies "$COOKIE_FILE" \
