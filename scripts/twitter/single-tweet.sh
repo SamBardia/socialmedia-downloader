@@ -1,7 +1,8 @@
 #!/bin/bash
 
 # ============================================
-# Twitter Single Tweet Downloader (Debug)
+# Twitter Single Tweet Downloader (Final)
+# با پشتیبانی از توییت‌های قفل‌شده یا حذف شده
 # ============================================
 
 if [ -f "config/twitter.conf" ]; then
@@ -17,34 +18,10 @@ URL="$1"
 mkdir -p "$DOWNLOAD_PATH"
 cd "$DOWNLOAD_PATH"
 
-METADATA=$(python3 -m yt_dlp --skip-download --dump-json "$URL" 2>/dev/null)
-
-# Extract tweet ID for debug filename
-TWEET_ID=$(echo "$URL" | grep -oP 'status/\K[0-9]+')
-if [ -z "$TWEET_ID" ]; then
-    TWEET_ID=$(echo "$METADATA" | jq -r '.id // empty')
-fi
-
-# DEBUG: Save full metadata
-echo "$METADATA" > "debug_${TWEET_ID}.json"
-echo "DEBUG: Full metadata saved to debug_${TWEET_ID}.json"
-
 # ============================================
-# Extract username with multiple fallbacks
+# Extract username from URL (most reliable)
 # ============================================
-USERNAME=$(echo "$METADATA" | jq -r '.channel // .uploader_id // empty')
-if [ -z "$USERNAME" ]; then
-    USERNAME=$(echo "$METADATA" | jq -r '.uploader // empty')
-    USERNAME=$(echo "$USERNAME" | perl -CSD -pe 's/[^\w\s\-]//g' 2>/dev/null || echo "$USERNAME" | sed 's/[^a-zA-Z0-9 ]//g')
-    USERNAME=$(echo "$USERNAME" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')
-    USERNAME=$(echo "$USERNAME" | sed 's/[[:space:]]\+/_/g')
-fi
-if [ -z "$USERNAME" ]; then
-    USERNAME=$(echo "$METADATA" | jq -r '.display_id // empty')
-fi
-if [ -z "$USERNAME" ]; then
-    USERNAME=$(echo "$URL" | grep -oP 'x\.com/\K[^/]+')
-fi
+USERNAME=$(echo "$URL" | grep -oP 'x\.com/\K[^/]+')
 if [ -z "$USERNAME" ]; then
     USERNAME=$(echo "$URL" | grep -oP 'twitter\.com/\K[^/]+')
 fi
@@ -54,7 +31,20 @@ fi
 USERNAME=$(echo "$USERNAME" | tr '[:upper:]' '[:lower:]')
 
 # ============================================
-# Extract full timestamp
+# Extract tweet ID from URL
+# ============================================
+TWEET_ID=$(echo "$URL" | grep -oP 'status/\K[0-9]+')
+if [ -z "$TWEET_ID" ]; then
+    TWEET_ID="unknown_id"
+fi
+
+# ============================================
+# Get metadata (if available)
+# ============================================
+METADATA=$(python3 -m yt_dlp --skip-download --dump-json "$URL" 2>/dev/null)
+
+# ============================================
+# Extract date from metadata or use current date
 # ============================================
 TIMESTAMP=$(echo "$METADATA" | jq -r '.timestamp // empty')
 if [ -n "$TIMESTAMP" ] && [ "$TIMESTAMP" != "null" ]; then
@@ -65,28 +55,14 @@ else
     TWEET_TIME=$(date +'%H:%M:%S')
 fi
 
-if [ -z "$TWEET_ID" ]; then
-    TWEET_ID=$(echo "$METADATA" | jq -r '.id // empty')
-fi
-
 # ============================================
-# Extract description with multiple fallbacks (including text)
+# Extract description from multiple sources
 # ============================================
 DESCRIPTION=$(echo "$METADATA" | jq -r '.description // empty')
 if [ -z "$DESCRIPTION" ]; then
     DESCRIPTION=$(echo "$METADATA" | jq -r '.title // empty')
     DESCRIPTION=$(echo "$DESCRIPTION" | sed 's/^X 上的 //' | sed 's/ \/ X$//')
-    if [ -z "$DESCRIPTION" ] || [[ "$DESCRIPTION" == "$USERNAME" ]]; then
-        DESCRIPTION=""
-    fi
 fi
-if [ -z "$DESCRIPTION" ]; then
-    DESCRIPTION=$(echo "$METADATA" | jq -r '.alt_title // empty')
-fi
-if [ -z "$DESCRIPTION" ]; then
-    DESCRIPTION=$(echo "$METADATA" | jq -r '.webpage_url // empty')
-fi
-# NEW: Try 'text' and 'content' fields
 if [ -z "$DESCRIPTION" ]; then
     DESCRIPTION=$(echo "$METADATA" | jq -r '.text // empty')
 fi
@@ -97,7 +73,7 @@ if [ -z "$DESCRIPTION" ]; then
     DESCRIPTION=$(echo "$METADATA" | jq -r '.full_text // empty')
 fi
 if [ -z "$DESCRIPTION" ]; then
-    DESCRIPTION="Tweet contains only a link (no additional text)"
+    DESCRIPTION="[Tweet content not available - possibly deleted or private]"
 fi
 
 # ============================================
@@ -117,8 +93,14 @@ TEMP_DIR="${FINAL_ZIP_NAME%.zip}"
 mkdir -p "$TEMP_DIR"
 cd "$TEMP_DIR"
 
+# ============================================
+# Save description
+# ============================================
 printf '%s\n' "$DESCRIPTION" > "${TEMP_DIR}.txt"
 
+# ============================================
+# Save info file
+# ============================================
 {
     printf 'Tweet ID: %s\n' "$TWEET_ID"
     printf 'Author: %s\n' "$USERNAME"
@@ -127,6 +109,9 @@ printf '%s\n' "$DESCRIPTION" > "${TEMP_DIR}.txt"
     printf 'URL: %s\n' "$URL"
 } > "${TEMP_DIR}(info).txt"
 
+# ============================================
+# Download media (if any)
+# ============================================
 python3 -m yt_dlp \
     --retries 5 \
     --fragment-retries 5 \
@@ -136,13 +121,7 @@ python3 -m yt_dlp \
     --output "${TEMP_DIR} - %(playlist_index)02d.%(ext)s" \
     "$URL" 2>/dev/null
 
-for file in *NA*; do
-    if [ -f "$file" ]; then
-        newfile=$(echo "$file" | sed 's/ - NA//' | sed 's/NA - //')
-        mv "$file" "$newfile" 2>/dev/null
-    fi
-done
-
+# Rename media files
 MEDIA_COUNTER=1
 for file in $(ls -1 *.mp4 *.jpg *.png *.jpeg *.webm 2>/dev/null | sort); do
     ext="${file##*.}"
@@ -155,6 +134,9 @@ done
 
 cd ..
 
+# ============================================
+# Create ZIP
+# ============================================
 TOTAL_SIZE=$(du -sb "$TEMP_DIR" | cut -f1)
 MAX_SIZE_BYTES=$((MAX_ZIP_SIZE_MB * 1024 * 1024))
 
