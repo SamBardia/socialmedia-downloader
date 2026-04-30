@@ -1,9 +1,5 @@
 #!/bin/bash
 
-# ============================================
-# SoundCloud Single Track Downloader
-# ============================================
-
 # Load configuration file
 if [ -f "config/soundcloud.conf" ]; then
     source "config/soundcloud.conf"
@@ -43,9 +39,10 @@ fi
 # Clean title: remove invalid characters
 TITLE=$(echo "$TITLE" | sed 's/[\/\\:*?"<>|]/_/g' | sed 's/[[:space:]]/_/g' | sed 's/__*/_/g' | sed 's/^_//;s/_$//')
 
-# Remove artist name from title if duplicated
-if [[ "$TITLE" == "$ARTIST - "* ]]; then
-    TITLE="${TITLE#$ARTIST - }"
+# Remove artist name from title if it appears at the beginning
+if [[ "$TITLE" == "$ARTIST"* ]]; then
+    TITLE="${TITLE#$ARTIST}"
+    TITLE=$(echo "$TITLE" | sed 's/^[ _-]*//')
 fi
 
 # Build base filename
