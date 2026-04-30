@@ -105,22 +105,7 @@ cd "$DOWNLOAD_PATH"
 # Get video metadata
 METADATA=$(python3 -m yt_dlp --cookies "$COOKIE_FILE" --skip-download --dump-json "$URL" 2>/dev/null)
 
-# Extract uploader and title
-UPLOADER=$(echo "$METADATA" | jq -r '.uploader // empty')
-if [ -z "$UPLOADER" ]; then
-    UPLOADER=$(echo "$METADATA" | jq -r '.channel // empty')
-fi
-if [ -z "$UPLOADER" ]; then
-    UPLOADER=$(echo "$URL" | grep -oP 'youtube\.com/@\K[^/?]+' | head -1)
-fi
-if [ -z "$UPLOADER" ]; then
-    UPLOADER=$(echo "$URL" | grep -oP 'youtube\.com/channel/\K[^/?]+' | head -1)
-fi
-if [ -z "$UPLOADER" ]; then
-    UPLOADER="unknown_uploader"
-fi
-UPLOADER=$(echo "$UPLOADER" | sed 's/[^a-zA-Z0-9_-]/_/g')
-
+# Extract title (only, no uploader)
 TITLE=$(echo "$METADATA" | jq -r '.title // empty')
 if [ -z "$TITLE" ]; then
     TITLE=$(echo "$METADATA" | jq -r '.fulltitle // empty')
@@ -135,7 +120,7 @@ TITLE=$(echo "$TITLE" | sed 's/[^a-zA-Z0-9_\u0600-\u06FF -]//g' | sed 's/[_ ]\+/
 # Handle audio only
 # ============================================
 if [ "$REQUESTED_QUALITY" = "audio" ]; then
-    BASE_FILENAME="${UPLOADER} - ${TITLE} [AUDIO]"
+    BASE_FILENAME="${TITLE} (AUDIO)"
     FINAL_FILENAME="${BASE_FILENAME}.mp3"
     
     COUNTER=1
@@ -159,7 +144,7 @@ fi
 # Handle best quality
 # ============================================
 if [ "$REQUESTED_QUALITY" = "best" ]; then
-    BASE_FILENAME="${UPLOADER} - ${TITLE} [BEST]"
+    BASE_FILENAME="${TITLE} (BEST)"
     FINAL_FILENAME="${BASE_FILENAME}.mp4"
     
     COUNTER=1
@@ -195,7 +180,7 @@ if [ "$ACTUAL_QUALITY" != "$REQUESTED_QUALITY" ]; then
 fi
 
 ACTUAL_HEIGHT=$(get_height_filter "$ACTUAL_QUALITY")
-BASE_FILENAME="${UPLOADER} - ${TITLE} [${ACTUAL_QUALITY}p]"
+BASE_FILENAME="${TITLE} (${ACTUAL_QUALITY}p)"
 FINAL_FILENAME="${BASE_FILENAME}.mp4"
 
 COUNTER=1
