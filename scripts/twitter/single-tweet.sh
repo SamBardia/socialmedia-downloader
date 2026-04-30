@@ -1,9 +1,7 @@
 #!/bin/bash
 
 # ============================================
-# Twitter Single Tweet Downloader (Final)
-# Full Persian/Unicode support + Time + Numbering
-# Without stats (views, likes, retweets, replies)
+# Twitter Single Tweet Downloader (Debug)
 # ============================================
 
 if [ -f "config/twitter.conf" ]; then
@@ -21,13 +19,22 @@ cd "$DOWNLOAD_PATH"
 
 METADATA=$(python3 -m yt_dlp --skip-download --dump-json "$URL" 2>/dev/null)
 
+# Extract tweet ID for debug filename
+TWEET_ID=$(echo "$URL" | grep -oP 'status/\K[0-9]+')
+if [ -z "$TWEET_ID" ]; then
+    TWEET_ID=$(echo "$METADATA" | jq -r '.id // empty')
+fi
+
+# DEBUG: Save full metadata
+echo "$METADATA" > "debug_${TWEET_ID}.json"
+echo "DEBUG: Full metadata saved to debug_${TWEET_ID}.json"
+
 # ============================================
 # Extract username with multiple fallbacks
 # ============================================
 USERNAME=$(echo "$METADATA" | jq -r '.channel // .uploader_id // empty')
 if [ -z "$USERNAME" ]; then
     USERNAME=$(echo "$METADATA" | jq -r '.uploader // empty')
-    # Remove emojis and special chars from display name
     USERNAME=$(echo "$USERNAME" | perl -CSD -pe 's/[^\w\s\-]//g' 2>/dev/null || echo "$USERNAME" | sed 's/[^a-zA-Z0-9 ]//g')
     USERNAME=$(echo "$USERNAME" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')
     USERNAME=$(echo "$USERNAME" | sed 's/[[:space:]]\+/_/g')
@@ -35,7 +42,6 @@ fi
 if [ -z "$USERNAME" ]; then
     USERNAME=$(echo "$METADATA" | jq -r '.display_id // empty')
 fi
-# Extract username from URL if still empty
 if [ -z "$USERNAME" ]; then
     USERNAME=$(echo "$URL" | grep -oP 'x\.com/\K[^/]+')
 fi
@@ -59,23 +65,17 @@ else
     TWEET_TIME=$(date +'%H:%M:%S')
 fi
 
-# ============================================
-# Extract tweet ID
-# ============================================
-TWEET_ID=$(echo "$URL" | grep -oP 'status/\K[0-9]+')
 if [ -z "$TWEET_ID" ]; then
     TWEET_ID=$(echo "$METADATA" | jq -r '.id // empty')
 fi
 
 # ============================================
-# Extract description with multiple fallbacks
+# Extract description with multiple fallbacks (including text)
 # ============================================
 DESCRIPTION=$(echo "$METADATA" | jq -r '.description // empty')
 if [ -z "$DESCRIPTION" ]; then
     DESCRIPTION=$(echo "$METADATA" | jq -r '.title // empty')
-    # Remove "X 上的 " prefix and trailing " / X" if present
     DESCRIPTION=$(echo "$DESCRIPTION" | sed 's/^X 上的 //' | sed 's/ \/ X$//')
-    # If after cleaning it's just the username or empty, try other fields
     if [ -z "$DESCRIPTION" ] || [[ "$DESCRIPTION" == "$USERNAME" ]]; then
         DESCRIPTION=""
     fi
@@ -85,6 +85,16 @@ if [ -z "$DESCRIPTION" ]; then
 fi
 if [ -z "$DESCRIPTION" ]; then
     DESCRIPTION=$(echo "$METADATA" | jq -r '.webpage_url // empty')
+fi
+# NEW: Try 'text' and 'content' fields
+if [ -z "$DESCRIPTION" ]; then
+    DESCRIPTION=$(echo "$METADATA" | jq -r '.text // empty')
+fi
+if [ -z "$DESCRIPTION" ]; then
+    DESCRIPTION=$(echo "$METADATA" | jq -r '.content // empty')
+fi
+if [ -z "$DESCRIPTION" ]; then
+    DESCRIPTION=$(echo "$METADATA" | jq -r '.full_text // empty')
 fi
 if [ -z "$DESCRIPTION" ]; then
     DESCRIPTION="Tweet contains only a link (no additional text)"
@@ -107,14 +117,8 @@ TEMP_DIR="${FINAL_ZIP_NAME%.zip}"
 mkdir -p "$TEMP_DIR"
 cd "$TEMP_DIR"
 
-# ============================================
-# Save description with UTF-8 encoding
-# ============================================
 printf '%s\n' "$DESCRIPTION" > "${TEMP_DIR}.txt"
 
-# ============================================
-# Save info file (without stats)
-# ============================================
 {
     printf 'Tweet ID: %s\n' "$TWEET_ID"
     printf 'Author: %s\n' "$USERNAME"
@@ -123,9 +127,6 @@ printf '%s\n' "$DESCRIPTION" > "${TEMP_DIR}.txt"
     printf 'URL: %s\n' "$URL"
 } > "${TEMP_DIR}(info).txt"
 
-# ============================================
-# Download media (ignore errors)
-# ============================================
 python3 -m yt_dlp \
     --retries 5 \
     --fragment-retries 5 \
@@ -135,9 +136,6 @@ python3 -m yt_dlp \
     --output "${TEMP_DIR} - %(playlist_index)02d.%(ext)s" \
     "$URL" 2>/dev/null
 
-# ============================================
-# Fix 'NA' filenames and rename media files
-# ============================================
 for file in *NA*; do
     if [ -f "$file" ]; then
         newfile=$(echo "$file" | sed 's/ - NA//' | sed 's/NA - //')
@@ -157,9 +155,6 @@ done
 
 cd ..
 
-# ============================================
-# Create ZIP archive (with splitting if needed)
-# ============================================
 TOTAL_SIZE=$(du -sb "$TEMP_DIR" | cut -f1)
 MAX_SIZE_BYTES=$((MAX_ZIP_SIZE_MB * 1024 * 1024))
 
