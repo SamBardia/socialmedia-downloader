@@ -1,7 +1,8 @@
 #!/bin/bash
 
 # ============================================
-# Twitter Single Tweet Downloader (Fixed)
+# Twitter Single Tweet Downloader (Final)
+# Full Persian/Unicode support
 # ============================================
 
 if [ -f "config/twitter.conf" ]; then
@@ -19,65 +20,64 @@ cd "$DOWNLOAD_PATH"
 
 METADATA=$(python3 -m yt_dlp --skip-download --dump-json "$URL" 2>/dev/null)
 
-# Extract username and clean it (remove emojis and special chars)
-USERNAME=$(echo "$METADATA" | grep -oP '"uploader":\s*"\K[^"]+' | head -1)
+# Extract username (channel/uploader_id) - clean version
+USERNAME=$(echo "$METADATA" | jq -r '.channel // .uploader_id // empty')
 if [ -z "$USERNAME" ]; then
-    USERNAME=$(echo "$METADATA" | grep -oP '"channel":\s*"\K[^"]+' | head -1)
+    USERNAME=$(echo "$METADATA" | jq -r '.uploader // empty' | sed 's/[^a-zA-Z0-9_]//g')
 fi
+USERNAME=$(echo "$USERNAME" | tr '[:upper:]' '[:lower:]')
 
-# Clean username: remove emojis and non-ASCII, replace spaces
-USERNAME=$(echo "$USERNAME" | perl -CSD -pe 's/[^\w\s\-]//g' 2>/dev/null || echo "$USERNAME" | sed 's/[^a-zA-Z0-9 ]//g')
-USERNAME=$(echo "$USERNAME" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')
-USERNAME=$(echo "$USERNAME" | sed 's/[[:space:]]\+/_/g')
-
-TIMESTAMP=$(echo "$METADATA" | grep -oP '"timestamp":\s*[0-9]+' | grep -oP '[0-9]+')
-if [ -n "$TIMESTAMP" ]; then
+# Extract tweet date
+TIMESTAMP=$(echo "$METADATA" | jq -r '.timestamp // empty')
+if [ -n "$TIMESTAMP" ] && [ "$TIMESTAMP" != "null" ]; then
     TWEET_DATE=$(date -d "@$TIMESTAMP" +'%Y-%m-%d' 2>/dev/null)
 else
     TWEET_DATE=$(date +'%Y-%m-%d')
 fi
 
+# Extract tweet ID
 TWEET_ID=$(echo "$URL" | grep -oP 'status/\K[0-9]+')
 if [ -z "$TWEET_ID" ]; then
-    TWEET_ID=$(echo "$METADATA" | grep -oP '"id":\s*[0-9]+' | head -1 | grep -oP '[0-9]+')
+    TWEET_ID=$(echo "$METADATA" | jq -r '.id // empty')
 fi
 
-# Decode unicode escaped text (e.g., \u0633 -> س)
-DESCRIPTION_RAW=$(echo "$METADATA" | grep -oP '"description":\s*"\K[^"]+' | head -1)
-if [ -z "$DESCRIPTION_RAW" ]; then
-    DESCRIPTION_RAW=$(echo "$METADATA" | grep -oP '"title":\s*"\K[^"]+' | head -1)
-fi
-DESCRIPTION=$(printf '%b' "$(echo "$DESCRIPTION_RAW" | sed 's/\\u/\\x/g')" 2>/dev/null || echo "$DESCRIPTION_RAW")
+# Extract description with Persian/Unicode support
+DESCRIPTION=$(echo "$METADATA" | jq -r '.description // .title // empty')
 
-VIEWS=$(echo "$METADATA" | grep -oP '"view_count":\s*[0-9]+' | grep -oP '[0-9]+')
-LIKES=$(echo "$METADATA" | grep -oP '"like_count":\s*[0-9]+' | grep -oP '[0-9]+')
-RETWEETS=$(echo "$METADATA" | grep -oP '"retweet_count":\s*[0-9]+' | grep -oP '[0-9]+')
-REPLIES=$(echo "$METADATA" | grep -oP '"reply_count":\s*[0-9]+' | grep -oP '[0-9]+')
+# If description is still empty or has encoding issues, try alternative
+if [ -z "$DESCRIPTION" ] || [[ "$DESCRIPTION" == *"\\u"* ]]; then
+    DESCRIPTION=$(echo "$METADATA" | jq -r '.title // empty')
+fi
+
+# Extract stats
+VIEWS=$(echo "$METADATA" | jq -r '.view_count // empty')
+LIKES=$(echo "$METADATA" | jq -r '.like_count // empty')
+RETWEETS=$(echo "$METADATA" | jq -r '.retweet_count // empty')
+REPLIES=$(echo "$METADATA" | jq -r '.reply_count // empty')
 
 BASE_FILENAME="${USERNAME} - ${TWEET_DATE} - ${TWEET_ID}"
 
-# Create temp directory (flat structure, no subfolders)
 TEMP_DIR="${BASE_FILENAME}"
 mkdir -p "$TEMP_DIR"
 cd "$TEMP_DIR"
 
-# Save decoded text
-echo "$DESCRIPTION" > "${BASE_FILENAME}.txt"
+# Save description with UTF-8 encoding (Persian-safe)
+printf '%s\n' "$DESCRIPTION" > "${BASE_FILENAME}.txt"
 
 # Save info
 {
-    echo "Tweet ID: $TWEET_ID"
-    echo "Author: $USERNAME"
-    echo "Date: $TWEET_DATE"
-    echo "URL: $URL"
-    echo "---"
-    echo "Views: ${VIEWS:-N/A}"
-    echo "Likes: ${LIKES:-N/A}"
-    echo "Retweets: ${RETWEETS:-N/A}"
-    echo "Replies: ${REPLIES:-N/A}"
+    printf 'Tweet ID: %s\n' "$TWEET_ID"
+    printf 'Author: %s\n' "$USERNAME"
+    printf 'Date: %s\n' "$TWEET_DATE"
+    printf 'URL: %s\n' "$URL"
+    printf '---\n'
+    printf 'Views: %s\n' "${VIEWS:-N/A}"
+    printf 'Likes: %s\n' "${LIKES:-N/A}"
+    printf 'Retweets: %s\n' "${RETWEETS:-N/A}"
+    printf 'Replies: %s\n' "${REPLIES:-N/A}"
 } > "${BASE_FILENAME}(info).txt"
 
-# Download media into current temp directory (not subfolders)
+# Download media
 python3 -m yt_dlp \
     --retries 5 \
     --fragment-retries 5 \
@@ -87,7 +87,7 @@ python3 -m yt_dlp \
     --output "${BASE_FILENAME} - %(playlist_index)02d.%(ext)s" \
     "$URL" 2>/dev/null
 
-# Fix any 'NA' filenames and remove empty directories
+# Fix any 'NA' filenames
 for file in *NA*; do
     if [ -f "$file" ]; then
         newfile=$(echo "$file" | sed 's/ - NA//' | sed 's/NA - //')
@@ -95,7 +95,7 @@ for file in *NA*; do
     fi
 done
 
-# Ensure media files have correct numbering
+# Ensure correct numbering for media files
 COUNTER=1
 for file in $(ls -1 *.mp4 *.jpg *.png *.jpeg *.webm 2>/dev/null | sort); do
     ext="${file##*.}"
@@ -108,7 +108,7 @@ done
 
 cd ..
 
-# Create ZIP
+# Create ZIP archive
 TOTAL_SIZE=$(du -sb "$TEMP_DIR" | cut -f1)
 MAX_SIZE_BYTES=$((MAX_ZIP_SIZE_MB * 1024 * 1024))
 
