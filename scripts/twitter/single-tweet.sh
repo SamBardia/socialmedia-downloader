@@ -2,7 +2,7 @@
 
 # ============================================
 # Twitter Single Tweet Downloader (Final)
-# Full Persian/Unicode support
+# Full Persian/Unicode support + Time + Stats
 # ============================================
 
 if [ -f "config/twitter.conf" ]; then
@@ -27,12 +27,14 @@ if [ -z "$USERNAME" ]; then
 fi
 USERNAME=$(echo "$USERNAME" | tr '[:upper:]' '[:lower:]')
 
-# Extract tweet date
+# Extract full timestamp (date + time)
 TIMESTAMP=$(echo "$METADATA" | jq -r '.timestamp // empty')
 if [ -n "$TIMESTAMP" ] && [ "$TIMESTAMP" != "null" ]; then
     TWEET_DATE=$(date -d "@$TIMESTAMP" +'%Y-%m-%d' 2>/dev/null)
+    TWEET_TIME=$(date -d "@$TIMESTAMP" +'%H:%M:%S' 2>/dev/null)
 else
     TWEET_DATE=$(date +'%Y-%m-%d')
+    TWEET_TIME=$(date +'%H:%M:%S')
 fi
 
 # Extract tweet ID
@@ -49,11 +51,17 @@ if [ -z "$DESCRIPTION" ] || [[ "$DESCRIPTION" == *"\\u"* ]]; then
     DESCRIPTION=$(echo "$METADATA" | jq -r '.title // empty')
 fi
 
-# Extract stats
-VIEWS=$(echo "$METADATA" | jq -r '.view_count // empty')
-LIKES=$(echo "$METADATA" | jq -r '.like_count // empty')
-RETWEETS=$(echo "$METADATA" | jq -r '.retweet_count // empty')
-REPLIES=$(echo "$METADATA" | jq -r '.reply_count // empty')
+# Extract stats (with fallbacks for fields that might be missing)
+VIEWS=$(echo "$METADATA" | jq -r '.view_count // .views // empty')
+LIKES=$(echo "$METADATA" | jq -r '.like_count // .favorite_count // empty')
+RETWEETS=$(echo "$METADATA" | jq -r '.retweet_count // .retweets // empty')
+REPLIES=$(echo "$METADATA" | jq -r '.reply_count // .replies // empty')
+
+# If any stat is "null" or empty, set to "N/A"
+[ -z "$VIEWS" ] || [ "$VIEWS" = "null" ] && VIEWS="N/A"
+[ -z "$LIKES" ] || [ "$LIKES" = "null" ] && LIKES="N/A"
+[ -z "$RETWEETS" ] || [ "$RETWEETS" = "null" ] && RETWEETS="N/A"
+[ -z "$REPLIES" ] || [ "$REPLIES" = "null" ] && REPLIES="N/A"
 
 BASE_FILENAME="${USERNAME} - ${TWEET_DATE} - ${TWEET_ID}"
 
@@ -64,17 +72,18 @@ cd "$TEMP_DIR"
 # Save description with UTF-8 encoding (Persian-safe)
 printf '%s\n' "$DESCRIPTION" > "${BASE_FILENAME}.txt"
 
-# Save info
+# Save info with time and stats
 {
     printf 'Tweet ID: %s\n' "$TWEET_ID"
     printf 'Author: %s\n' "$USERNAME"
     printf 'Date: %s\n' "$TWEET_DATE"
+    printf 'Time: %s\n' "$TWEET_TIME"
     printf 'URL: %s\n' "$URL"
     printf '---\n'
-    printf 'Views: %s\n' "${VIEWS:-N/A}"
-    printf 'Likes: %s\n' "${LIKES:-N/A}"
-    printf 'Retweets: %s\n' "${RETWEETS:-N/A}"
-    printf 'Replies: %s\n' "${REPLIES:-N/A}"
+    printf 'Views: %s\n' "$VIEWS"
+    printf 'Likes: %s\n' "$LIKES"
+    printf 'Retweets: %s\n' "$RETWEETS"
+    printf 'Replies: %s\n' "$REPLIES"
 } > "${BASE_FILENAME}(info).txt"
 
 # Download media
