@@ -1,0 +1,114 @@
+name: YouTube Downloader
+
+on:
+  push:
+    branches: [ "main" ]
+  workflow_dispatch:
+
+jobs:
+  download:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      # ============================================
+      # Get the commit message
+      # ============================================
+      - name: Get commit message
+        id: message
+        run: |
+          echo "msg<<EOF" >> $GITHUB_OUTPUT
+          git log -1 --pretty=%B >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+
+      # ============================================
+      # Extract all YouTube URLs with quality
+      # ============================================
+      - name: Extract all YouTube URLs
+        id: extract
+        run: |
+          MSG="${{ steps.message.outputs.msg }}"
+          
+          # Array of quality prefixes
+          PREFIXES=("yt-144" "yt-240" "yt-360" "yt-480" "yt-720" "yt-1080" "yt-best" "yt-audio")
+          
+          echo "urls_json=" >> $GITHUB_OUTPUT
+          echo "found=false" >> $GITHUB_OUTPUT
+          
+          for prefix in "${PREFIXES[@]}"; do
+            # Extract URLs for this quality
+            URLS=$(echo "$MSG" | grep -oP "${prefix}:\s*\Khttps?://[^\s]+" || true)
+            if [ -n "$URLS" ]; then
+              quality="${prefix#yt-}"
+              echo "Found ${prefix}: $URLS"
+              while IFS= read -r url; do
+                if [ -n "$url" ]; then
+                  echo "url_${quality}<<EOF" >> $GITHUB_OUTPUT
+                  echo "$url" >> $GITHUB_OUTPUT
+                  echo "EOF" >> $GITHUB_OUTPUT
+                  echo "found=true" >> $GITHUB_OUTPUT
+                fi
+              done <<< "$URLS"
+            fi
+          done
+
+      # ============================================
+      # Install dependencies
+      # ============================================
+      - name: Install dependencies
+        if: steps.extract.outputs.found == 'true'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ffmpeg zip jq
+          pip install --no-deps yt-dlp
+          pip install brotlicffi
+
+      # ============================================
+      # Process all YouTube URLs
+      # ============================================
+      - name: Process all YouTube URLs
+        if: steps.extract.outputs.found == 'true'
+        run: |
+          chmod +x scripts/youtube/single-video.sh
+          
+          # Process each quality separately
+          for quality in 144 240 360 480 720 1080 best audio; do
+            url_var="url_${quality}"
+            if [ -n "${{ steps.extract.outputs[url_var] }}" ]; then
+              echo "${{ steps.extract.outputs[url_var] }}" | while read -r URL; do
+                [ -z "$URL" ] && continue
+                echo ""
+                echo "========================================="
+                echo "Processing: $URL with quality $quality"
+                echo "========================================="
+                ./scripts/youtube/single-video.sh "$URL" "$quality"
+              done
+            fi
+          done
+
+      # ============================================
+      # Push to repository
+      # ============================================
+      - name: Push to repository
+        if: steps.extract.outputs.found == 'true'
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git pull origin main --rebase || true
+          git add downloads/youtube/
+          git commit -m "Add YouTube content [skip ci]" || echo "No changes to commit"
+          git push
+
+      # ============================================
+      # List downloaded files
+      # ============================================
+      - name: List downloaded files
+        if: steps.extract.outputs.found == 'true'
+        run: |
+          echo "========================================="
+          echo "Files in downloads/youtube/:"
+          echo "========================================="
+          ls -la downloads/youtube/
