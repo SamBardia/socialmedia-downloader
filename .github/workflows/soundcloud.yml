@@ -1,12 +1,9 @@
 name: SoundCloud Downloader
 
 on:
+  push:
+    branches: [ "main" ]
   workflow_dispatch:
-    inputs:
-      urls:
-        description: 'SoundCloud URLs (one per line)'
-        required: true
-        type: string
 
 jobs:
   download:
@@ -17,62 +14,55 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      # ============================================
-      # Install dependencies (ffmpeg, zip, yt-dlp)
-      # ============================================
+      - name: Get commit message
+        id: message
+        run: |
+          echo "msg<<EOF" >> $GITHUB_OUTPUT
+          git log -1 --pretty=%B >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+
+      - name: Extract all SoundCloud URLs
+        id: extract
+        run: |
+          MSG="${{ steps.message.outputs.msg }}"
+          URLS=$(echo "$MSG" | grep -oP 'sc:\s*\Khttps?://[^\s]+')
+          if [ -n "$URLS" ]; then
+            echo "urls<<EOF" >> $GITHUB_OUTPUT
+            echo "$URLS" >> $GITHUB_OUTPUT
+            echo "EOF" >> $GITHUB_OUTPUT
+            echo "found=true" >> $GITHUB_OUTPUT
+          else
+            echo "found=false" >> $GITHUB_OUTPUT
+          fi
+
       - name: Install dependencies
+        if: steps.extract.outputs.found == 'true'
         run: |
           sudo apt-get update
           sudo apt-get install -y ffmpeg zip jq
           pip install yt-dlp
 
-      # ============================================
-      # Process all URLs (single track vs collection)
-      # ============================================
       - name: Process all URLs
+        if: steps.extract.outputs.found == 'true'
         run: |
-          # Make scripts executable
           chmod +x scripts/soundcloud/single.sh
           chmod +x scripts/soundcloud/album.sh
           
-          echo "${{ github.event.inputs.urls }}" | while read -r URL; do
+          echo "${{ steps.extract.outputs.urls }}" | while read -r URL; do
             [ -z "$URL" ] && continue
-            
-            echo ""
-            echo "========================================="
             echo "Processing: $URL"
-            echo "========================================="
-            
-            # Single track detection (no /sets/ or /playlists/)
-            if [[ "$URL" =~ ^https://soundcloud\.com/[^/]+/[^/]+$ ]] && [[ "$URL" != *"/sets/"* ]] && [[ "$URL" != *"/playlists/"* ]]; then
-              echo "Type: Single Track"
+            if [[ "$URL" =~ ^https://soundcloud\.com/[^/]+/[^/]+$ ]] && [[ "$URL" != *"/sets/"* ]]; then
               ./scripts/soundcloud/single.sh "$URL"
             else
-              # Any /sets/ or /playlists/ gets numbered (album or playlist)
-              echo "Type: Collection (numbered tracks)"
               ./scripts/soundcloud/album.sh "$URL"
             fi
-            
-            echo "Completed: $URL"
           done
 
-      # ============================================
-      # Push downloaded files to repository
-      # ============================================
       - name: Push to repository
+        if: steps.extract.outputs.found == 'true'
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add downloads/soundcloud/
-          git commit -m "Add SoundCloud content [skip ci]" || echo "No changes to commit"
+          git commit -m "Add SoundCloud content [skip ci]" || echo "No changes"
           git push
-
-      # ============================================
-      # List downloaded files
-      # ============================================
-      - name: List downloaded files
-        run: |
-          echo "========================================="
-          echo "Files in downloads/soundcloud/:"
-          echo "========================================="
-          ls -la downloads/soundcloud/
