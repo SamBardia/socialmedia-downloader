@@ -35,8 +35,12 @@ ARTIST=$(echo "$ARTIST" | sed 's/\\uff0c/,/g' | sed 's/،/,/g')
 # STEP 2: Replace commas with " & " (space-ampersand-space)
 ARTIST=$(echo "$ARTIST" | sed 's/[[:space:]]*,[[:space:]]*/ \& /g')
 
-# STEP 3: Clean artist name (remove invalid chars, replace spaces with underscore)
-ARTIST=$(echo "$ARTIST" | sed 's/[\/\\:*?"<>|]/_/g' | sed 's/[[:space:]]/_/g' | sed 's/__*/_/g' | sed 's/^_//;s/_$//')
+# STEP 3: Clean artist name (remove invalid chars ONLY, keep spaces)
+ARTIST=$(echo "$ARTIST" | sed 's/[\/\\:*?"<>|]/_/g')
+# Remove leading/trailing spaces
+ARTIST=$(echo "$ARTIST" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')
+# Replace multiple spaces with single space
+ARTIST=$(echo "$ARTIST" | sed 's/[[:space:]]\+/ /g')
 
 # Extract track title
 TITLE=$(echo "$METADATA" | grep -oP '"track":\s*"\K[^"]+' | head -1)
@@ -44,16 +48,18 @@ if [ -z "$TITLE" ]; then
     TITLE=$(echo "$METADATA" | grep -oP '"title":\s*"\K[^"]+' | head -1)
 fi
 
-# Clean title: remove invalid characters
-TITLE=$(echo "$TITLE" | sed 's/[\/\\:*?"<>|]/_/g' | sed 's/[[:space:]]/_/g' | sed 's/__*/_/g' | sed 's/^_//;s/_$//')
+# Clean title (remove invalid chars ONLY, keep spaces)
+TITLE=$(echo "$TITLE" | sed 's/[\/\\:*?"<>|]/_/g')
+TITLE=$(echo "$TITLE" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')
+TITLE=$(echo "$TITLE" | sed 's/[[:space:]]\+/ /g')
 
 # Remove artist name from title if it appears at the beginning
 if [[ "$TITLE" == "$ARTIST"* ]]; then
     TITLE="${TITLE#$ARTIST}"
-    TITLE=$(echo "$TITLE" | sed 's/^[ _-]*//')
+    TITLE=$(echo "$TITLE" | sed 's/^[[:space:]-]*//')
 fi
 
-# Build base filename
+# Build base filename (preserve spaces, no underscores)
 BASE_FILENAME="${ARTIST} - ${TITLE}"
 EXTENSION="$AUDIO_FORMAT"
 
