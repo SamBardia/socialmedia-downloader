@@ -21,8 +21,8 @@ ARTIST=$(echo "$METADATA" | jq -r '.artist // .uploader // empty')
 if [ -z "$ARTIST" ]; then
     ARTIST="unknown_artist"
 fi
-# Clean artist name
-ARTIST=$(echo "$ARTIST" | sed 's/[\/\\:*?"<>|]/_/g' | sed 's/[[:space:]]\+/_/g' | sed 's/^_//;s/_$//')
+# STEP 1: Replace unicode fullwidth comma with regular comma
+ARTIST=$(echo "$ARTIST" | perl -CSD -pe 's/\x{ff0c}/,/g' 2>/dev/null || echo "$ARTIST" | sed 's/，/,/g')
 
 TITLE=$(echo "$METADATA" | jq -r '.track // .title // empty')
 if [ -z "$TITLE" ]; then
