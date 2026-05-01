@@ -1,1 +1,153 @@
+name: Universal Downloader
 
+on:
+  workflow_dispatch:
+    inputs:
+      urls:
+        description: 'Enter URLs (one per line)'
+        required: true
+        type: string
+      youtube_quality:
+        description: 'YouTube quality (for video entries)'
+        required: false
+        default: '480p'
+        type: choice
+        options:
+          - '144p'
+          - '240p'
+          - '360p'
+          - '480p'
+          - '720p'
+          - '1080p'
+          - 'best'
+          - 'audio'
+      twitter_profile_count:
+        description: 'Number of tweets for Twitter profile (max 50)'
+        required: false
+        default: '20'
+        type: string
+      instagram_profile_count:
+        description: 'Number of posts for Instagram profile (max 30)'
+        required: false
+        default: '10'
+        type: string
+      youtube_channel_count:
+        description: 'Number of videos for YouTube channel (max 50)'
+        required: false
+        default: '10'
+        type: string
+
+jobs:
+  download:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ffmpeg zip jq
+          pip install yt-dlp gallery-dl brotlicffi
+
+      - name: Process URLs
+        env:
+          YOUTUBE_COOKIES: ${{ secrets.YOUTUBE_COOKIES }}
+          INSTAGRAM_COOKIES: ${{ secrets.INSTAGRAM_COOKIES }}
+        run: |
+          # Helper to detect platform
+          detect_platform() {
+            local url="$1"
+            if [[ "$url" == *"soundcloud.com"* ]]; then
+              echo "soundcloud"
+            elif [[ "$url" == *"x.com"* ]] || [[ "$url" == *"twitter.com"* ]]; then
+              echo "twitter"
+            elif [[ "$url" == *"youtu.be"* ]] || [[ "$url" == *"youtube.com"* ]]; then
+              echo "youtube"
+            elif [[ "$url" == *"instagram.com"* ]]; then
+              echo "instagram"
+            elif [[ "$url" == *"tiktok.com"* ]]; then
+              echo "tiktok"
+            else
+              echo "unknown"
+            fi
+          }
+
+          IFS=$'\n'
+          for URL in $(echo "${{ github.event.inputs.urls }}" | tr ',' '\n' | sed 's/^[[:space:]]*//;s/[[:space:]]*$//'); do
+            [ -z "$URL" ] && continue
+            echo "========================================="
+            echo "Processing: $URL"
+            PLATFORM=$(detect_platform "$URL")
+            echo "Platform: $PLATFORM"
+            case "$PLATFORM" in
+              soundcloud)
+                if [[ "$URL" == *"/sets/"* ]]; then
+                  ./scripts/soundcloud/album.sh "$URL"
+                else
+                  ./scripts/soundcloud/single.sh "$URL"
+                fi
+                ;;
+              twitter)
+                if [[ "$URL" == *"/status/"* ]]; then
+                  # Check if thread indicator (e.g., multiple tweets linked) – simplified
+                  # For thread we rely on thread.sh which detects via flat-playlist
+                  if echo "$URL" | grep -q '/status/'; then
+                    # Try thread detection: if the URL is the first tweet of a thread
+                    # For simplicity, we assume all status URLs are single tweets.
+                    # User can use separate thread command or we can implement heuristic.
+                    ./scripts/twitter/single.sh "$URL"
+                  else
+                    ./scripts/twitter/single.sh "$URL"
+                  fi
+                else
+                  # Assume it's a profile URL
+                  ./scripts/twitter/profile.sh "$URL" "${{ github.event.inputs.twitter_profile_count }}"
+                fi
+                ;;
+              youtube)
+                if [[ "$URL" == *"list="* ]]; then
+                  ./scripts/youtube/playlist.sh "$URL" "${{ github.event.inputs.youtube_quality }}"
+                elif [[ "$URL" == *"/channel/"* ]] || [[ "$URL" == *"/@"* ]]; then
+                  ./scripts/youtube/channel.sh "$URL" "${{ github.event.inputs.youtube_channel_count }}" "${{ github.event.inputs.youtube_quality }}"
+                else
+                  ./scripts/youtube/single.sh "$URL" "${{ github.event.inputs.youtube_quality }}"
+                fi
+                ;;
+              instagram)
+                if [[ "$URL" == *"/stories/"* ]] || [[ "$URL" == *"/story/"* ]]; then
+                  ./scripts/instagram/story.sh "$URL"
+                elif [[ "$URL" == *"/p/"* ]] || [[ "$URL" == *"/reel/"* ]]; then
+                  ./scripts/instagram/single.sh "$URL"
+                else
+                  ./scripts/instagram/profile.sh "$URL" "${{ github.event.inputs.instagram_profile_count }}"
+                fi
+                ;;
+              tiktok)
+                ./scripts/tiktok/single.sh "$URL"
+                ;;
+              *)
+                echo "WARNING: Unsupported platform for $URL"
+                ;;
+            esac
+          done
+
+      - name: Push to repository
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add downloads/
+          git diff --cached --quiet || git commit -m "Add downloaded content [skip ci]"
+          git pull --rebase origin main || true
+          git push
+
+      - name: Display summary
+        run: |
+          echo "========================================="
+          echo "Download summary"
+          echo "========================================="
+          for dir in downloads/*/; do
+            [ -d "$dir" ] && echo "📁 $(basename "$dir"): $(ls -1 "$dir" | wc -l) items"
+          done
