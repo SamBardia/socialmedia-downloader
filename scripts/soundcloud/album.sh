@@ -39,7 +39,7 @@ while [ -f "$FINAL_ZIP_NAME" ]; do
     COUNT=$((COUNT + 1))
 done
 
-TEMP_DIR="${COLLECTION_NAME}_temp"
+TEMP_DIR="${COLLECTION_NAME} Album"
 mkdir -p "$TEMP_DIR"
 cd "$TEMP_DIR"
 
