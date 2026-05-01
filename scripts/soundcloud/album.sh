@@ -48,6 +48,19 @@ for file in *.mp3; do
     newname=$(echo "$file" | sed 's/，/,/g' | sed 's/،/,/g' | sed 's/,/ \& /g')
     [ "$file" != "$newname" ] && mv "$file" "$newname" 2>/dev/null
 done
+# Fix filenames: extract real track name from the mess
+for file in *.mp3; do
+    if [ -f "$file" ]; then
+        # Extract everything after last newline (the actual track name)
+        CLEAN_NAME=$(echo "$file" | tail -1)
+        # Get the track number and artist from the original name
+        PREFIX=$(echo "$file" | cut -d' ' -f1-3)
+        NEW_NAME="${PREFIX} ${CLEAN_NAME}"
+        if [ "$file" != "$NEW_NAME" ]; then
+            mv "$file" "$NEW_NAME" 2>/dev/null || true
+        fi
+    fi
+done
 # Download cover art (best effort)
 python3 -m yt_dlp --skip-download --write-thumbnail --convert-thumbnails jpg \
     --output "${COLLECTION_NAME}_cover" "$URL" 2>/dev/null
