@@ -102,11 +102,6 @@ jobs:
             PLATFORM=$(detect_platform "$URL")
             echo "Platform: $PLATFORM"
             
-            # Create cookie file for YouTube
-            if [ "$PLATFORM" = "youtube" ] && [ -n "$YOUTUBE_COOKIES" ]; then
-              echo "$YOUTUBE_COOKIES" > /tmp/yt_cookies.txt
-            fi
-            
             case "$PLATFORM" in
               soundcloud)
                 if [[ "$URL" == *"/sets/"* ]]; then
@@ -123,13 +118,19 @@ jobs:
                 fi
                 ;;
               youtube)
+                # Create cookie file for YouTube
+                echo "$YOUTUBE_COOKIES" > /tmp/yt_cookies.txt
+                
                 if [[ "$URL" == *"list="* ]]; then
-                  ./scripts/youtube/playlist.sh "$URL" "${{ github.event.inputs.youtube_quality }}"
+                  ./scripts/youtube/playlist.sh "$URL" "${{ github.event.inputs.youtube_quality }}" "/tmp/yt_cookies.txt"
                 elif [[ "$URL" == *"/channel/"* ]] || [[ "$URL" == *"/@"* ]]; then
-                  ./scripts/youtube/channel.sh "$URL" "${{ github.event.inputs.youtube_channel_count }}" "${{ github.event.inputs.youtube_quality }}"
+                  ./scripts/youtube/channel.sh "$URL" "${{ github.event.inputs.youtube_channel_count }}" "${{ github.event.inputs.youtube_quality }}" "/tmp/yt_cookies.txt"
                 else
-                  ./scripts/youtube/single.sh "$URL" "${{ github.event.inputs.youtube_quality }}"
+                  ./scripts/youtube/single.sh "$URL" "${{ github.event.inputs.youtube_quality }}" "/tmp/yt_cookies.txt"
                 fi
+                
+                # Clean up
+                rm -f /tmp/yt_cookies.txt
                 ;;
               instagram)
                 if [[ "$URL" == *"/stories/"* ]] || [[ "$URL" == *"/story/"* ]]; then
@@ -147,10 +148,6 @@ jobs:
                 echo "WARNING: Unsupported platform for $URL"
                 ;;
             esac
-            
-            # Clean up cookie file
-            [ -f "/tmp/yt_cookies.txt" ] && rm -f /tmp/yt_cookies.txt
-            
           done
 
       - name: Push to repository
