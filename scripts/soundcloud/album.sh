@@ -1,6 +1,6 @@
 #!/bin/bash
 # ============================================
-# SoundCloud album/playlist downloader
+# SoundCloud album/playlist downloader with fallback
 # ============================================
 
 if [ -f "config/soundcloud.conf" ]; then
@@ -37,10 +37,13 @@ while [ -f "$FINAL_ZIP_NAME" ]; do
     COUNT=$((COUNT + 1))
 done
 
-TEMP_DIR="${COLLECTION_NAME} Album"
+TEMP_DIR="temp_${COLLECTION_NAME}"
 mkdir -p "$TEMP_DIR"
 cd "$TEMP_DIR"
 
+# ============================================
+# Try standard download
+# ============================================
 python3 -m yt_dlp --skip-download --write-thumbnail --convert-thumbnails jpg \
     --output "${COLLECTION_NAME}_cover" "$URL" 2>/dev/null
 
@@ -51,20 +54,46 @@ python3 -m yt_dlp --extract-audio --audio-format "$AUDIO_FORMAT" \
     --ignore-errors --no-abort-on-error \
     --output "%(playlist_index)02d - %(artist)s - %(track)s.%(ext)s" "$URL"
 
-rm -f *.webp 2>/dev/null
-rm -f *.jpg.* 2>/dev/null
+# Check if downloaded MP3 files exist and have valid filenames
+if [ -n "$(find . -maxdepth 1 -name '*.mp3' -print -quit 2>/dev/null)" ] && \
+   [ -z "$(find . -maxdepth 1 -name '*\n*' -print -quit 2>/dev/null)" ]; then
+    # Standard download succeeded
+    cd ..
+    TOTAL_SIZE=$(du -sb "$TEMP_DIR" | cut -f1)
+    MAX_SIZE_BYTES=$((MAX_ZIP_SIZE_MB * 1024 * 1024))
 
-cd ..
-
-TOTAL_SIZE=$(du -sb "$TEMP_DIR" | cut -f1)
-MAX_SIZE_BYTES=$((MAX_ZIP_SIZE_MB * 1024 * 1024))
-
-if [ "$SPLIT_LARGE_FILES" = "true" ] && [ "$TOTAL_SIZE" -gt "$MAX_SIZE_BYTES" ]; then
-    zip -s "${MAX_ZIP_SIZE_MB}m" -r "$FINAL_ZIP_NAME" "$TEMP_DIR"
-else
-    zip -r "$FINAL_ZIP_NAME" "$TEMP_DIR"
+    if [ "$SPLIT_LARGE_FILES" = "true" ] && [ "$TOTAL_SIZE" -gt "$MAX_SIZE_BYTES" ]; then
+        zip -s "${MAX_ZIP_SIZE_MB}m" -r "$FINAL_ZIP_NAME" "$TEMP_DIR"
+    else
+        zip -r "$FINAL_ZIP_NAME" "$TEMP_DIR"
+    fi
+    rm -rf "$TEMP_DIR"
+    echo "SUCCESS: $FINAL_ZIP_NAME"
+    ls -la "$FINAL_ZIP_NAME"*
+    exit 0
 fi
 
-rm -rf "$TEMP_DIR"
-echo "SUCCESS: $FINAL_ZIP_NAME"
-ls -la "$FINAL_ZIP_NAME"*
+# ============================================
+# Fallback: extract track URLs and provide text file
+# ============================================
+echo "Standard download failed. Generating fallback text file with track URLs..."
+
+TRACKS_FILE="tracks.txt"
+python3 -m yt_dlp --flat-playlist --print "%(url)s" "$URL" 2>/dev/null > "$TRACKS_FILE"
+
+# If the above didn't work, try alternative method
+if [ ! -s "$TRACKS_FILE" ]; then
+    python3 -m yt_dlp --flat-playlist --print "url" "$URL" 2>/dev/null > "$TRACKS_FILE"
+fi
+
+if [ -s "$TRACKS_FILE" ]; then
+    cd ..
+    zip -j "$FINAL_ZIP_NAME" "$TEMP_DIR/$TRACKS_FILE"
+    rm -rf "$TEMP_DIR"
+    echo "SUCCESS (Fallback): $FINAL_ZIP_NAME contains $TRACKS_FILE with track URLs"
+    ls -la "$FINAL_ZIP_NAME"*
+else
+    echo "ERROR: Failed to extract track URLs for fallback"
+    rm -rf "$TEMP_DIR"
+    exit 1
+fi
