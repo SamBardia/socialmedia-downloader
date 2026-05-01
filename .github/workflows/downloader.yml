@@ -46,12 +46,23 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
+      - name: Install Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
       - name: Install dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y nodejs npm ffmpeg zip jq
+          sudo apt-get install -y ffmpeg zip jq
           pip install --upgrade yt-dlp
           yt-dlp --update-to nightly
+
+      - name: Setup PO Token Provider
+        run: |
+          docker run -d --name bgutil-provider -p 4416:4416 brainicism/bgutil-ytdlp-pot-provider:latest
+          sleep 5
+          echo "BGUTIL_PROVIDER=http://localhost:4416" >> $GITHUB_ENV
 
       - name: Process URLs
         env:
@@ -65,21 +76,17 @@ jobs:
           chmod +x scripts/youtube/*.sh
           chmod +x scripts/instagram/*.sh
           chmod +x scripts/tiktok/*.sh
+          
           detect_platform() {
               local url="$1"
-              # SoundCloud: direct, short (on.soundcloud.com), old short (snd.sc)
               if [[ "$url" == *"soundcloud.com"* ]] || [[ "$url" == *"on.soundcloud.com"* ]] || [[ "$url" == *"snd.sc"* ]]; then
                   echo "soundcloud"
-              # Twitter/X: direct, short (t.co is handled by yt-dlp itself)
               elif [[ "$url" == *"x.com"* ]] || [[ "$url" == *"twitter.com"* ]] || [[ "$url" == *"t.co"* ]]; then
                   echo "twitter"
-              # YouTube: direct, short (youtu.be), mobile (m.youtube.com)
               elif [[ "$url" == *"youtu.be"* ]] || [[ "$url" == *"youtube.com"* ]] || [[ "$url" == *"m.youtube.com"* ]]; then
                   echo "youtube"
-              # Instagram: direct, short (instagr.am), mobile (instagram.com/p/...)
               elif [[ "$url" == *"instagram.com"* ]] || [[ "$url" == *"instagr.am"* ]] || [[ "$url" == *"ig.me"* ]]; then
                   echo "instagram"
-              # TikTok: direct, short (tiktok.com/@.../video/..., vm.tiktok.com)
               elif [[ "$url" == *"tiktok.com"* ]] || [[ "$url" == *"vm.tiktok.com"* ]] || [[ "$url" == *"vt.tiktok.com"* ]]; then
                   echo "tiktok"
               else
@@ -87,13 +94,19 @@ jobs:
               fi
           }
 
-            IFS=$'\n'
-            for URL in $(echo "${{ github.event.inputs.urls }}" | tr ',' '\n' | tr ' ' '\n' | sed 's/^[[:space:]]*//;s/[[:space:]]*$//'); do
+          IFS=$'\n'
+          for URL in $(echo "${{ github.event.inputs.urls }}" | tr ',' '\n' | tr ' ' '\n' | sed 's/^[[:space:]]*//;s/[[:space:]]*$//'); do
             [ -z "$URL" ] && continue
             echo "========================================="
             echo "Processing: $URL"
             PLATFORM=$(detect_platform "$URL")
             echo "Platform: $PLATFORM"
+            
+            # Create cookie file for YouTube
+            if [ "$PLATFORM" = "youtube" ] && [ -n "$YOUTUBE_COOKIES" ]; then
+              echo "$YOUTUBE_COOKIES" > /tmp/yt_cookies.txt
+            fi
+            
             case "$PLATFORM" in
               soundcloud)
                 if [[ "$URL" == *"/sets/"* ]]; then
@@ -104,18 +117,8 @@ jobs:
                 ;;
               twitter)
                 if [[ "$URL" == *"/status/"* ]]; then
-                  # Check if thread indicator (e.g., multiple tweets linked) – simplified
-                  # For thread we rely on thread.sh which detects via flat-playlist
-                  if echo "$URL" | grep -q '/status/'; then
-                    # Try thread detection: if the URL is the first tweet of a thread
-                    # For simplicity, we assume all status URLs are single tweets.
-                    # User can use separate thread command or we can implement heuristic.
-                    ./scripts/twitter/single.sh "$URL"
-                  else
-                    ./scripts/twitter/single.sh "$URL"
-                  fi
+                  ./scripts/twitter/single.sh "$URL"
                 else
-                  # Assume it's a profile URL
                   ./scripts/twitter/profile.sh "$URL" "${{ github.event.inputs.twitter_profile_count }}"
                 fi
                 ;;
@@ -144,6 +147,10 @@ jobs:
                 echo "WARNING: Unsupported platform for $URL"
                 ;;
             esac
+            
+            # Clean up cookie file
+            [ -f "/tmp/yt_cookies.txt" ] && rm -f /tmp/yt_cookies.txt
+            
           done
 
       - name: Push to repository
