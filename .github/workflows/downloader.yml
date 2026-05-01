@@ -55,8 +55,8 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y ffmpeg zip jq
-          pip install --upgrade yt-dlp
-          yt-dlp --update-to nightly
+          pip uninstall -y yt-dlp || true
+          pip install --upgrade --pre yt-dlp[default]
 
       - name: Setup PO Token Provider
         run: |
