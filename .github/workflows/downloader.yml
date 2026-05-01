@@ -65,20 +65,25 @@ jobs:
           chmod +x scripts/instagram/*.sh
           chmod +x scripts/tiktok/*.sh
           detect_platform() {
-            local url="$1"
-            if [[ "$url" == *"soundcloud.com"* ]]; then
-              echo "soundcloud"
-            elif [[ "$url" == *"x.com"* ]] || [[ "$url" == *"twitter.com"* ]]; then
-              echo "twitter"
-            elif [[ "$url" == *"youtu.be"* ]] || [[ "$url" == *"youtube.com"* ]]; then
-              echo "youtube"
-            elif [[ "$url" == *"instagram.com"* ]]; then
-              echo "instagram"
-            elif [[ "$url" == *"tiktok.com"* ]]; then
-              echo "tiktok"
-            else
-              echo "unknown"
-            fi
+              local url="$1"
+              # SoundCloud: direct, short (on.soundcloud.com), old short (snd.sc)
+              if [[ "$url" == *"soundcloud.com"* ]] || [[ "$url" == *"on.soundcloud.com"* ]] || [[ "$url" == *"snd.sc"* ]]; then
+                  echo "soundcloud"
+              # Twitter/X: direct, short (t.co is handled by yt-dlp itself)
+              elif [[ "$url" == *"x.com"* ]] || [[ "$url" == *"twitter.com"* ]] || [[ "$url" == *"t.co"* ]]; then
+                  echo "twitter"
+              # YouTube: direct, short (youtu.be), mobile (m.youtube.com)
+              elif [[ "$url" == *"youtu.be"* ]] || [[ "$url" == *"youtube.com"* ]] || [[ "$url" == *"m.youtube.com"* ]]; then
+                  echo "youtube"
+              # Instagram: direct, short (instagr.am), mobile (instagram.com/p/...)
+              elif [[ "$url" == *"instagram.com"* ]] || [[ "$url" == *"instagr.am"* ]] || [[ "$url" == *"ig.me"* ]]; then
+                  echo "instagram"
+              # TikTok: direct, short (tiktok.com/@.../video/..., vm.tiktok.com)
+              elif [[ "$url" == *"tiktok.com"* ]] || [[ "$url" == *"vm.tiktok.com"* ]] || [[ "$url" == *"vt.tiktok.com"* ]]; then
+                  echo "tiktok"
+              else
+                  echo "unknown"
+              fi
           }
 
             IFS=$'\n'
