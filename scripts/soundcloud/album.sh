@@ -42,7 +42,12 @@ done
 TEMP_DIR="${COLLECTION_NAME} Album"
 mkdir -p "$TEMP_DIR"
 cd "$TEMP_DIR"
-
+# Fix artist names with unicode comma
+for file in *.mp3; do
+    [ -f "$file" ] || continue
+    newname=$(echo "$file" | sed 's/，/,/g' | sed 's/،/,/g' | sed 's/,/ \& /g')
+    [ "$file" != "$newname" ] && mv "$file" "$newname" 2>/dev/null
+done
 # Download cover art (best effort)
 python3 -m yt_dlp --skip-download --write-thumbnail --convert-thumbnails jpg \
     --output "${COLLECTION_NAME}_cover" "$URL" 2>/dev/null
