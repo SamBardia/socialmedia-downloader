@@ -42,6 +42,19 @@ done
 TEMP_DIR="${COLLECTION_NAME} Album"
 mkdir -p "$TEMP_DIR"
 cd "$TEMP_DIR"
+# Fix filenames where yt-dlp used playlist title instead of track title
+for file in *.mp3; do
+    if [ -f "$file" ]; then
+        # Extract the last line (actual track name) from the messed-up filename
+        TRACK_NAME=$(echo "$file" | awk -F'\n' '{print $NF}')
+        # Get prefix (track number and artist)
+        PREFIX=$(echo "$file" | grep -oP '^\d{2} - .*? - ')
+        NEW_NAME="${PREFIX}${TRACK_NAME}"
+        if [ "$file" != "$NEW_NAME" ] && [ -n "$TRACK_NAME" ]; then
+            mv "$file" "$NEW_NAME" 2>/dev/null || true
+        fi
+    fi
+done
 # Fix artist names with unicode comma
 for file in *.mp3; do
     [ -f "$file" ] || continue
