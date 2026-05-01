@@ -1,6 +1,6 @@
 #!/bin/bash
 # ============================================
-# SoundCloud album/playlist downloader with fallback
+# SoundCloud album/playlist downloader
 # ============================================
 
 if [ -f "config/soundcloud.conf" ]; then
@@ -23,12 +23,15 @@ if [ -z "$COLLECTION_NAME" ]; then
     exit 1
 fi
 
+# Clean collection name
 COLLECTION_NAME=$(echo "$COLLECTION_NAME" | sed 's/[\/\\:*?"<>|]/_/g' | sed 's/[[:space:]]\+/_/g')
 COLLECTION_NAME="$(echo "${COLLECTION_NAME:0:1}" | tr '[:lower:]' '[:upper:]')${COLLECTION_NAME:1}"
 
+# Create main download directory
 mkdir -p "$DOWNLOAD_PATH"
 cd "$DOWNLOAD_PATH"
 
+# Prepare final ZIP file name
 BASE_ZIP_NAME="${COLLECTION_NAME}.zip"
 FINAL_ZIP_NAME="$BASE_ZIP_NAME"
 COUNT=1
@@ -37,27 +40,22 @@ while [ -f "$FINAL_ZIP_NAME" ]; do
     COUNT=$((COUNT + 1))
 done
 
+# Temporary directory for processing
 TEMP_DIR="temp_${COLLECTION_NAME}"
 mkdir -p "$TEMP_DIR"
-cd "$TEMP_DIR"
+cd "$TEMP_DIR" || exit 1
 
-# ============================================
-# Try standard download
-# ============================================
-python3 -m yt_dlp --skip-download --write-thumbnail --convert-thumbnails jpg \
-    --output "${COLLECTION_NAME}_cover" "$URL" 2>/dev/null
-
+# Attempt 1: Standard download via yt-dlp
 python3 -m yt_dlp --extract-audio --audio-format "$AUDIO_FORMAT" \
     --embed-thumbnail --convert-thumbnails jpg \
-    --retries 10 --fragment-retries 10 --retry-sleep exp=1:60 \
-    --sleep-interval 3 --max-sleep-interval 10 --limit-rate 500K \
+    --retries 5 --fragment-retries 5 --retry-sleep exp=1:60 \
+    --sleep-interval 2 --max-sleep-interval 5 --limit-rate 500K \
     --ignore-errors --no-abort-on-error \
     --output "%(playlist_index)02d - %(artist)s - %(track)s.%(ext)s" "$URL"
 
-# Check if downloaded MP3 files exist and have valid filenames
-if [ -n "$(find . -maxdepth 1 -name '*.mp3' -print -quit 2>/dev/null)" ] && \
-   [ -z "$(find . -maxdepth 1 -name '*\n*' -print -quit 2>/dev/null)" ]; then
-    # Standard download succeeded
+# Check if standard method succeeded
+if ls *.mp3 1> /dev/null 2>&1 && [ -z "$(find . -name '*\n*' -print -quit 2>/dev/null)" ]; then
+    # Standard download successful
     cd ..
     TOTAL_SIZE=$(du -sb "$TEMP_DIR" | cut -f1)
     MAX_SIZE_BYTES=$((MAX_ZIP_SIZE_MB * 1024 * 1024))
@@ -73,27 +71,22 @@ if [ -n "$(find . -maxdepth 1 -name '*.mp3' -print -quit 2>/dev/null)" ] && \
     exit 0
 fi
 
-# ============================================
-# Fallback: extract track URLs and provide text file
-# ============================================
+# --- Fallback: If standard method failed, create a text file with track links ---
 echo "Standard download failed. Generating fallback text file with track URLs..."
 
+# Extract all track URLs
 TRACKS_FILE="tracks.txt"
 python3 -m yt_dlp --flat-playlist --print "%(url)s" "$URL" 2>/dev/null > "$TRACKS_FILE"
 
-# If the above didn't work, try alternative method
 if [ ! -s "$TRACKS_FILE" ]; then
-    python3 -m yt_dlp --flat-playlist --print "url" "$URL" 2>/dev/null > "$TRACKS_FILE"
-fi
-
-if [ -s "$TRACKS_FILE" ]; then
-    cd ..
-    zip -j "$FINAL_ZIP_NAME" "$TEMP_DIR/$TRACKS_FILE"
-    rm -rf "$TEMP_DIR"
-    echo "SUCCESS (Fallback): $FINAL_ZIP_NAME contains $TRACKS_FILE with track URLs"
-    ls -la "$FINAL_ZIP_NAME"*
-else
-    echo "ERROR: Failed to extract track URLs for fallback"
-    rm -rf "$TEMP_DIR"
+    echo "ERROR: Could not extract track URLs even in fallback mode."
     exit 1
 fi
+
+cd ..
+zip -j "$FINAL_ZIP_NAME" "$TEMP_DIR/$TRACKS_FILE"
+rm -rf "$TEMP_DIR"
+
+echo "SUCCESS (Fallback): $FINAL_ZIP_NAME"
+echo "Archive contains '$TRACKS_FILE' with the list of track URLs."
+ls -la "$FINAL_ZIP_NAME"*
