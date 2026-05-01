@@ -28,7 +28,7 @@ TITLE=$(echo "$METADATA" | jq -r '.track // .title // empty')
 if [ -z "$TITLE" ]; then
     TITLE="unknown_title"
 fi
-TITLE=$(echo "$TITLE" | sed 's/[\/\\:*?"<>|]/_/g' | sed 's/[[:space:]]\+/_/g' | sed 's/^_//;s/_$//')
+TITLE=$(echo "$TITLE" | sed 's/[\/\\:*?"<>|]/_/g')
 
 BASE_FILENAME="${ARTIST} - ${TITLE}"
 EXTENSION="$AUDIO_FORMAT"
