@@ -58,6 +58,12 @@ jobs:
           INSTAGRAM_COOKIES: ${{ secrets.INSTAGRAM_COOKIES }}
         run: |
           # Helper to detect platform
+          # Make all scripts executable
+          chmod +x scripts/soundcloud/*.sh
+          chmod +x scripts/twitter/*.sh
+          chmod +x scripts/youtube/*.sh
+          chmod +x scripts/instagram/*.sh
+          chmod +x scripts/tiktok/*.sh
           detect_platform() {
             local url="$1"
             if [[ "$url" == *"soundcloud.com"* ]]; then
