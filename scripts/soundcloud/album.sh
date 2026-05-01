@@ -38,13 +38,17 @@ cd "$TEMP_DIR"
 echo "Extracting track URLs..."
 python3 -m yt_dlp --flat-playlist --print "%(url)s" "$URL" 2>/dev/null > track_urls.txt
 
+# Show how many tracks found
+TRACK_COUNT=$(wc -l < track_urls.txt)
+echo "Found $TRACK_COUNT tracks in album"
+
 # Download each track using single.sh
 TRACK_NUMBER=1
 while read -r TRACK_URL; do
     [ -z "$TRACK_URL" ] && continue
-    echo "Downloading track $TRACK_NUMBER: $TRACK_URL"
+    echo "Downloading track $TRACK_NUMBER of $TRACK_COUNT: $TRACK_URL"
     
-    # Download with single.sh (but save in current directory)
+    # Download with single.sh
     ../single.sh "$TRACK_URL"
     
     # Rename to add track number prefix
