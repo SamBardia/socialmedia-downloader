@@ -49,8 +49,9 @@ jobs:
       - name: Install dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y ffmpeg zip jq
-          pip install yt-dlp gallery-dl brotlicffi
+          sudo apt-get install -y nodejs npm ffmpeg zip jq
+          pip install --upgrade yt-dlp
+          yt-dlp --update-to nightly
 
       - name: Process URLs
         env:
