@@ -1,6 +1,7 @@
 #!/bin/bash
 # ============================================
 # SoundCloud album/playlist downloader
+# Uses single.sh for each track to avoid yt-dlp bugs
 # ============================================
 
 if [ -f "config/soundcloud.conf" ]; then
@@ -9,8 +10,6 @@ fi
 
 AUDIO_FORMAT="${AUDIO_FORMAT:-mp3}"
 DOWNLOAD_PATH="${DOWNLOAD_PATH:-downloads/soundcloud}"
-MAX_ZIP_SIZE_MB="${MAX_ZIP_SIZE_MB:-90}"
-SPLIT_LARGE_FILES="${SPLIT_LARGE_FILES:-true}"
 
 URL="$1"
 
@@ -30,6 +29,35 @@ COLLECTION_NAME="$(echo "${COLLECTION_NAME:0:1}" | tr '[:lower:]' '[:upper:]')${
 mkdir -p "$DOWNLOAD_PATH"
 cd "$DOWNLOAD_PATH"
 
+# Create a temporary directory for this album
+TEMP_DIR="${COLLECTION_NAME} Album"
+mkdir -p "$TEMP_DIR"
+cd "$TEMP_DIR"
+
+# Extract all track URLs using flat-playlist
+echo "Extracting track URLs..."
+python3 -m yt_dlp --flat-playlist --print "%(url)s" "$URL" 2>/dev/null > track_urls.txt
+
+# Download each track using single.sh
+TRACK_NUMBER=1
+while read -r TRACK_URL; do
+    [ -z "$TRACK_URL" ] && continue
+    echo "Downloading track $TRACK_NUMBER: $TRACK_URL"
+    
+    # Download with single.sh (but save in current directory)
+    ../single.sh "$TRACK_URL"
+    
+    # Rename to add track number prefix
+    for file in *.mp3; do
+        if [ -f "$file" ] && [ ! -f "${TRACK_NUMBER} - $file" ]; then
+            mv "$file" "${TRACK_NUMBER} - $file" 2>/dev/null
+        fi
+    done
+    
+    TRACK_NUMBER=$((TRACK_NUMBER + 1))
+done < track_urls.txt
+
+cd ..
 # Handle duplicate ZIP files
 BASE_ZIP_NAME="${COLLECTION_NAME}.zip"
 FINAL_ZIP_NAME="$BASE_ZIP_NAME"
@@ -39,65 +67,14 @@ while [ -f "$FINAL_ZIP_NAME" ]; do
     COUNT=$((COUNT + 1))
 done
 
-TEMP_DIR="${COLLECTION_NAME} Album"
-mkdir -p "$TEMP_DIR"
-cd "$TEMP_DIR"
-
-# Download cover art (best effort)
-python3 -m yt_dlp --skip-download --write-thumbnail --convert-thumbnails jpg \
-    --retries 10 --retry-sleep exp=1:60 \
-    --output "${COLLECTION_NAME}_cover" "$URL" 2>/dev/null
-
-# Download all tracks with track numbers
-python3 -m yt_dlp --extract-audio --audio-format "$AUDIO_FORMAT" \
-    --embed-thumbnail --convert-thumbnails jpg \
-    --retries 10 --fragment-retries 10 --retry-sleep exp=1:60 \
-    --sleep-interval 3 --max-sleep-interval 10 --limit-rate 500K \
-    --ignore-errors --no-abort-on-error \
-    --output "%(playlist_index)02d - %(artist)s - %(track)s.%(ext)s" "$URL"
-
-# ============================================
-# Fix filename issues caused by yt-dlp bug
-# ============================================
-
-# Fix 1: Replace unicode comma and regular comma with " & "
-for file in *.mp3; do
-    [ -f "$file" ] || continue
-    newname=$(echo "$file" | sed 's/，/,/g' | sed 's/،/,/g' | sed 's/,/ \& /g')
-    [ "$file" != "$newname" ] && mv "$file" "$newname" 2>/dev/null
-done
-
-# Fix 2: If filename contains newlines (yt-dlp bug), extract the last line as track name
-for file in *.mp3; do
-    if [ -f "$file" ] && [[ "$file" == *$'\n'* ]]; then
-        # Get the track number and artist prefix (first 3 fields)
-        PREFIX=$(echo "$file" | cut -d' ' -f1-3)
-        # Get the last line (actual track name)
-        TRACK_NAME=$(echo "$file" | awk -F'\n' '{print $NF}')
-        NEW_NAME="${PREFIX} ${TRACK_NAME}"
-        if [ "$file" != "$NEW_NAME" ]; then
-            mv "$file" "$NEW_NAME" 2>/dev/null || true
-        fi
-    fi
-done
-
-cd ..
-
 # Create ZIP archive
 if [ -d "$TEMP_DIR" ] && [ "$(ls -A "$TEMP_DIR" 2>/dev/null)" ]; then
-    TOTAL_SIZE=$(du -sb "$TEMP_DIR" | cut -f1)
-    MAX_SIZE_BYTES=$((MAX_ZIP_SIZE_MB * 1024 * 1024))
-
-    if [ "$SPLIT_LARGE_FILES" = "true" ] && [ "$TOTAL_SIZE" -gt "$MAX_SIZE_BYTES" ]; then
-        zip -s "${MAX_ZIP_SIZE_MB}m" -r "$FINAL_ZIP_NAME" "$TEMP_DIR"
-    else
-        zip -r "$FINAL_ZIP_NAME" "$TEMP_DIR"
-    fi
+    zip -r "$FINAL_ZIP_NAME" "$TEMP_DIR"
     rm -rf "$TEMP_DIR"
     echo "SUCCESS: $FINAL_ZIP_NAME"
-    ls -la "$FINAL_ZIP_NAME"*
+    ls -la "$FINAL_ZIP_NAME"
 else
-    echo "ERROR: No files downloaded for album"
+    echo "ERROR: No files downloaded"
     rm -rf "$TEMP_DIR"
     exit 1
 fi
