@@ -42,40 +42,10 @@ done
 TEMP_DIR="${COLLECTION_NAME} Album"
 mkdir -p "$TEMP_DIR"
 cd "$TEMP_DIR"
-# Fix filenames where yt-dlp used playlist title instead of track title
-for file in *.mp3; do
-    if [ -f "$file" ]; then
-        # Extract the last line (actual track name) from the messed-up filename
-        TRACK_NAME=$(echo "$file" | awk -F'\n' '{print $NF}')
-        # Get prefix (track number and artist)
-        PREFIX=$(echo "$file" | grep -oP '^\d{2} - .*? - ')
-        NEW_NAME="${PREFIX}${TRACK_NAME}"
-        if [ "$file" != "$NEW_NAME" ] && [ -n "$TRACK_NAME" ]; then
-            mv "$file" "$NEW_NAME" 2>/dev/null || true
-        fi
-    fi
-done
-# Fix artist names with unicode comma
-for file in *.mp3; do
-    [ -f "$file" ] || continue
-    newname=$(echo "$file" | sed 's/，/,/g' | sed 's/،/,/g' | sed 's/,/ \& /g')
-    [ "$file" != "$newname" ] && mv "$file" "$newname" 2>/dev/null
-done
-# Fix filenames: extract real track name from the mess
-for file in *.mp3; do
-    if [ -f "$file" ]; then
-        # Extract everything after last newline (the actual track name)
-        CLEAN_NAME=$(echo "$file" | tail -1)
-        # Get the track number and artist from the original name
-        PREFIX=$(echo "$file" | cut -d' ' -f1-3)
-        NEW_NAME="${PREFIX} ${CLEAN_NAME}"
-        if [ "$file" != "$NEW_NAME" ]; then
-            mv "$file" "$NEW_NAME" 2>/dev/null || true
-        fi
-    fi
-done
+
 # Download cover art (best effort)
 python3 -m yt_dlp --skip-download --write-thumbnail --convert-thumbnails jpg \
+    --retries 10 --retry-sleep exp=1:60 \
     --output "${COLLECTION_NAME}_cover" "$URL" 2>/dev/null
 
 # Download all tracks with track numbers
@@ -86,16 +56,48 @@ python3 -m yt_dlp --extract-audio --audio-format "$AUDIO_FORMAT" \
     --ignore-errors --no-abort-on-error \
     --output "%(playlist_index)02d - %(artist)s - %(track)s.%(ext)s" "$URL"
 
+# ============================================
+# Fix filename issues caused by yt-dlp bug
+# ============================================
+
+# Fix 1: Replace unicode comma and regular comma with " & "
+for file in *.mp3; do
+    [ -f "$file" ] || continue
+    newname=$(echo "$file" | sed 's/，/,/g' | sed 's/،/,/g' | sed 's/,/ \& /g')
+    [ "$file" != "$newname" ] && mv "$file" "$newname" 2>/dev/null
+done
+
+# Fix 2: If filename contains newlines (yt-dlp bug), extract the last line as track name
+for file in *.mp3; do
+    if [ -f "$file" ] && [[ "$file" == *$'\n'* ]]; then
+        # Get the track number and artist prefix (first 3 fields)
+        PREFIX=$(echo "$file" | cut -d' ' -f1-3)
+        # Get the last line (actual track name)
+        TRACK_NAME=$(echo "$file" | awk -F'\n' '{print $NF}')
+        NEW_NAME="${PREFIX} ${TRACK_NAME}"
+        if [ "$file" != "$NEW_NAME" ]; then
+            mv "$file" "$NEW_NAME" 2>/dev/null || true
+        fi
+    fi
+done
+
 cd ..
-TOTAL_SIZE=$(du -sb "$TEMP_DIR" | cut -f1)
-MAX_SIZE_BYTES=$((MAX_ZIP_SIZE_MB * 1024 * 1024))
 
-if [ "$SPLIT_LARGE_FILES" = "true" ] && [ "$TOTAL_SIZE" -gt "$MAX_SIZE_BYTES" ]; then
-    zip -s "${MAX_ZIP_SIZE_MB}m" -r "$FINAL_ZIP_NAME" "$TEMP_DIR"
+# Create ZIP archive
+if [ -d "$TEMP_DIR" ] && [ "$(ls -A "$TEMP_DIR" 2>/dev/null)" ]; then
+    TOTAL_SIZE=$(du -sb "$TEMP_DIR" | cut -f1)
+    MAX_SIZE_BYTES=$((MAX_ZIP_SIZE_MB * 1024 * 1024))
+
+    if [ "$SPLIT_LARGE_FILES" = "true" ] && [ "$TOTAL_SIZE" -gt "$MAX_SIZE_BYTES" ]; then
+        zip -s "${MAX_ZIP_SIZE_MB}m" -r "$FINAL_ZIP_NAME" "$TEMP_DIR"
+    else
+        zip -r "$FINAL_ZIP_NAME" "$TEMP_DIR"
+    fi
+    rm -rf "$TEMP_DIR"
+    echo "SUCCESS: $FINAL_ZIP_NAME"
+    ls -la "$FINAL_ZIP_NAME"*
 else
-    zip -r "$FINAL_ZIP_NAME" "$TEMP_DIR"
+    echo "ERROR: No files downloaded for album"
+    rm -rf "$TEMP_DIR"
+    exit 1
 fi
-
-rm -rf "$TEMP_DIR"
-echo "SUCCESS: $FINAL_ZIP_NAME"
-ls -la "$FINAL_ZIP_NAME"*
