@@ -81,8 +81,8 @@ jobs:
             fi
           }
 
-          IFS=$'\n'
-          for URL in $(echo "${{ github.event.inputs.urls }}" | tr ',' '\n' | sed 's/^[[:space:]]*//;s/[[:space:]]*$//'); do
+            IFS=$'\n'
+            for URL in $(echo "${{ github.event.inputs.urls }}" | tr ',' '\n' | tr ' ' '\n' | sed 's/^[[:space:]]*//;s/[[:space:]]*$//'); do
             [ -z "$URL" ] && continue
             echo "========================================="
             echo "Processing: $URL"
