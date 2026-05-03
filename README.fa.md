@@ -35,8 +35,8 @@
 3.  به پایین صفحه بروید تا بخش **Workflow permissions** را ببینید.
 4.  گزینه **Read and write permissions** را انتخاب کنید.
 5.  روی دکمه **Save** کلیک کنید.
-<del>
 ### ۳. (فقط برای یوتیوب) تنظیم کوکی
+<del>
 برای دانلود از یوتیوب، باید کوکی مرورگر خود را در مخزن ذخیره کنید. این کار به `yt-dlp` کمک می‌کند تا به عنوان یک کاربر واقعی شناسایی شود.
 
 1.  افزونه **Get cookies.txt LOCALLY** را روی مرورگر خود نصب کنید ([لینک کروم](https://chrome.google.com/webstore/detail/get-cookiestxt-locally/cclelndahbckbenkjhflpdbgdldlbecc) - [لینک فایرفاکس](https://addons.mozilla.org/en-US/firefox/addon/cookies-txt/)).
