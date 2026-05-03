@@ -1,18 +1,6 @@
 #!/bin/bash
 # ============================================
 # SoundCloud Full Artist Archive Downloader
-# Downloads all singles and albums from an artist's profile.
-# Output structure:
-#   Artist - Complete_Files.zip
-#   ├── Singles/
-#   │   ├── Artist - Track 1.mp3
-#   │   └── ...
-#   └── EPs & Albums/
-#       ├── Album Name 1/
-#       │   ├── 01 - Track 1.mp3
-#       │   └── ...
-#       └── Album Name 2/
-#           └── ...
 # ============================================
 
 if [ -f "config/soundcloud.conf" ]; then
@@ -89,7 +77,7 @@ done < album_links.txt
 # Clean up temporary files
 rm -f raw_data.json single_links.txt album_links.txt
 
-# --- Create Final ZIP Archive ---
+# --- Go back to download directory and create ZIP ---
 cd ..
 
 BASE_ZIP_NAME="${ARTIST_NAME} - Complete_Files.zip"
