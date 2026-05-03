@@ -33,11 +33,11 @@ on:
       #   required: false
       #   default: '10'
       #   type: string
-      youtube_channel_count:
-        description: 'Number of videos for YouTube channel (max 50)'
-        required: false
-        default: '10'
-        type: string
+      # youtube_channel_count:
+      #   description: 'Number of videos for YouTube channel (max 50)'
+      #   required: false
+      #   default: '10'
+      #   type: string
 
 jobs:
   download:
