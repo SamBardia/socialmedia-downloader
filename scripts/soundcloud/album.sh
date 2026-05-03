@@ -74,8 +74,8 @@ if [ -z "$TARGET_DIR" ]; then
     mkdir -p "$DOWNLOAD_PATH"
     cd "$DOWNLOAD_PATH" || exit 1
     
-    # Create temporary directory for album
-    TEMP_DIR="${ALBUM_NAME}_temp"
+    # Create temporary directory for album with desired name
+    TEMP_DIR="${ALBUM_NAME} Album"
     mkdir -p "$TEMP_DIR"
     
     # Download tracks into temp directory
@@ -95,7 +95,7 @@ if [ -z "$TARGET_DIR" ]; then
     MAX_SIZE_BYTES=$((MAX_ZIP_SIZE_MB * 1024 * 1024))
     
     if [ "$SPLIT_LARGE_FILES" = "true" ] && [ "$TOTAL_SIZE" -gt "$MAX_SIZE_BYTES" ]; then
-        zip -s "${MAX_ZIP_SIZE_MB}m" -r "$FINAL_ZIP_NAME" "$TEMP_DIR"
+        zip -s "${MAX_ZIP_SIZE_MB}m} -r "$FINAL_ZIP_NAME" "$TEMP_DIR"
     else
         zip -r "$FINAL_ZIP_NAME" "$TEMP_DIR"
     fi
