@@ -1,6 +1,7 @@
 #!/bin/bash
 # ============================================
-# SoundCloud album/playlist downloader
+# Improved SoundCloud Album/Playlist Downloader
+# Downloads album tracks to a specified target directory (no ZIP).
 # ============================================
 
 if [ -f "config/soundcloud.conf" ]; then
@@ -8,85 +9,41 @@ if [ -f "config/soundcloud.conf" ]; then
 fi
 
 AUDIO_FORMAT="${AUDIO_FORMAT:-mp3}"
-DOWNLOAD_PATH="${DOWNLOAD_PATH:-downloads/soundcloud}"
 MAX_ZIP_SIZE_MB="${MAX_ZIP_SIZE_MB:-90}"
 SPLIT_LARGE_FILES="${SPLIT_LARGE_FILES:-true}"
 
 URL="$1"
+TARGET_DIR="$2"  # e.g., 'EPs & Albums/Album Name'
 
-COLLECTION_NAME=$(echo "$URL" | sed -n 's|.*/sets/\([^/?]*\).*|\1|p')
-if [ -z "$COLLECTION_NAME" ]; then
-    COLLECTION_NAME=$(echo "$URL" | sed -n 's|.*/playlists/\([^/?]*\).*|\1|p')
-fi
-if [ -z "$COLLECTION_NAME" ]; then
-    echo "ERROR: Could not extract collection name"
+if [ -z "$TARGET_DIR" ]; then
+    echo "ERROR: No target directory provided."
     exit 1
 fi
 
-# Clean collection name
-COLLECTION_NAME=$(echo "$COLLECTION_NAME" | sed 's/[\/\\:*?"<>|]/_/g' | sed 's/[[:space:]]\+/_/g')
-COLLECTION_NAME="$(echo "${COLLECTION_NAME:0:1}" | tr '[:lower:]' '[:upper:]')${COLLECTION_NAME:1}"
+mkdir -p "$TARGET_DIR"
 
-# Create main download directory
-mkdir -p "$DOWNLOAD_PATH"
-cd "$DOWNLOAD_PATH"
+ALBUM_NAME=$(basename "$TARGET_DIR")
+echo "Downloading Album: $ALBUM_NAME to $TARGET_DIR"
 
-# Prepare final ZIP file name
-BASE_ZIP_NAME="${COLLECTION_NAME}.zip"
-FINAL_ZIP_NAME="$BASE_ZIP_NAME"
-COUNT=1
-while [ -f "$FINAL_ZIP_NAME" ]; do
-    FINAL_ZIP_NAME="${COLLECTION_NAME}(${COUNT}).zip"
-    COUNT=$((COUNT + 1))
-done
-
-# Temporary directory for processing
-TEMP_DIR="temp_${COLLECTION_NAME}"
+TEMP_DIR="${ALBUM_NAME}_temp"
 mkdir -p "$TEMP_DIR"
 cd "$TEMP_DIR" || exit 1
 
-# Attempt 1: Standard download via yt-dlp
+# Download all tracks with numbered filenames
 python3 -m yt_dlp --extract-audio --audio-format "$AUDIO_FORMAT" \
     --embed-thumbnail --convert-thumbnails jpg \
-    --retries 5 --fragment-retries 5 --retry-sleep exp=1:60 \
-    --sleep-interval 2 --max-sleep-interval 5 --limit-rate 500K \
+    --retries 10 --fragment-retries 10 --retry-sleep exp=1:60 \
+    --sleep-interval 3 --max-sleep-interval 10 --limit-rate 500K \
     --ignore-errors --no-abort-on-error \
-    --output "%(playlist_index)02d - %(artist)s - %(track)s.%(ext)s" "$URL"
+    --output "%(playlist_index)02d - %(title)s.%(ext)s" \
+    "$URL"
 
-# Check if standard method succeeded
-if ls *.mp3 1> /dev/null 2>&1 && [ -z "$(find . -name '*\n*' -print -quit 2>/dev/null)" ]; then
-    # Standard download successful
-    cd ..
-    TOTAL_SIZE=$(du -sb "$TEMP_DIR" | cut -f1)
-    MAX_SIZE_BYTES=$((MAX_ZIP_SIZE_MB * 1024 * 1024))
+rm -f *.webp 2>/dev/null
+rm -f *.jpg.* 2>/dev/null
 
-    if [ "$SPLIT_LARGE_FILES" = "true" ] && [ "$TOTAL_SIZE" -gt "$MAX_SIZE_BYTES" ]; then
-        zip -s "${MAX_ZIP_SIZE_MB}m" -r "$FINAL_ZIP_NAME" "$TEMP_DIR"
-    else
-        zip -r "$FINAL_ZIP_NAME" "$TEMP_DIR"
-    fi
-    rm -rf "$TEMP_DIR"
-    echo "SUCCESS: $FINAL_ZIP_NAME"
-    ls -la "$FINAL_ZIP_NAME"*
-    exit 0
-fi
-
-# --- Fallback: If standard method failed, create a text file with track links ---
-echo "Standard download failed. Generating fallback text file with track URLs..."
-
-# Extract all track URLs
-TRACKS_FILE="tracks.txt"
-python3 -m yt_dlp --flat-playlist --print "%(url)s" "$URL" 2>/dev/null > "$TRACKS_FILE"
-
-if [ ! -s "$TRACKS_FILE" ]; then
-    echo "ERROR: Could not extract track URLs even in fallback mode."
-    exit 1
-fi
-
+# Move files to the final target directory
 cd ..
-zip -j "$FINAL_ZIP_NAME" "$TEMP_DIR/$TRACKS_FILE"
+mv "$TEMP_DIR"/* "$TARGET_DIR" 2>/dev/null
 rm -rf "$TEMP_DIR"
 
-echo "SUCCESS (Fallback): $FINAL_ZIP_NAME"
-echo "Archive contains '$TRACKS_FILE' with the list of track URLs."
-ls -la "$FINAL_ZIP_NAME"*
+echo "Album Download Completed: $ALBUM_NAME"
