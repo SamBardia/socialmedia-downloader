@@ -36,7 +36,6 @@
 4.  گزینه **Read and write permissions** را انتخاب کنید.
 5.  روی دکمه **Save** کلیک کنید.
 ### ۳. (فقط برای یوتیوب) تنظیم کوکی
-<del>
 برای دانلود از یوتیوب، باید کوکی مرورگر خود را در مخزن ذخیره کنید. این کار به `yt-dlp` کمک می‌کند تا به عنوان یک کاربر واقعی شناسایی شود.
 
 1.  افزونه **Get cookies.txt LOCALLY** را روی مرورگر خود نصب کنید ([لینک کروم](https://chrome.google.com/webstore/detail/get-cookiestxt-locally/cclelndahbckbenkjhflpdbgdldlbecc) - [لینک فایرفاکس](https://addons.mozilla.org/en-US/firefox/addon/cookies-txt/)).
@@ -47,8 +46,7 @@
 6.  **Name** را `YOUTUBE_COOKIES` وارد کنید.
 7.  **Secret** را **تمام محتوای** فایل `cookies.txt` (که با Notepad باز کرده‌اید) کپی کنید.
 8.  روی **Add secret** کلیک کنید.
-</del>
-
+ 
 ### ۴. شروع دانلود (تنها روش)
 
 **این پروژه فقط از روش اجرای دستی (workflow_dispatch) استفاده می‌کند.**
@@ -59,9 +57,9 @@
 4.  یک فرم باز می‌شود که باید آن را پر کنید:
     - **Enter URLs (one per line):** لینک‌های خود را وارد کنید (هر لینک در یک خط). مثال:
     - https://soundcloud.com/artist/sets/album
-    - ~~https://www.youtube.com/watch?v=XXXX~~
+    - https://www.youtube.com/watch?v=XXXX
     - https://x.com/user/status/123456
-    - ~~**YouTube quality (for video entries):** کیفیت دانلود برای لینک‌های یوتیوب را انتخاب کنید (پیش‌فرض `480p`).~~
+    - **YouTube quality (for video entries):** کیفیت دانلود برای لینک‌های یوتیوب را انتخاب کنید (پیش‌فرض `480p`).
 - بقیه گزینه‌ها (تعداد توییت‌های پروفایل توییتر، تعداد پست‌های اینستاگرام و تعداد ویدیوهای کانال یوتیوب) اختیاری هستند.
 5.  روی دکمه سبز **Run workflow** کلیک کنید.
 
@@ -93,7 +91,7 @@ downloads/
 | :--- | :--- | :--- |
 | **ساوندکلاود** | `scripts/soundcloud/single.sh` و `album.sh` | تک آهنگ به صورت `Artist - Title.mp3` و آلبوم/پلی‌لیست به صورت `آلبوم.zip` شامل ترک‌های شماره‌گذاری شده |
 | **توییتر (X)** | `scripts/twitter/single.sh` | فقط توییت‌های دارای رسانه را پردازش می‌کند و یک فایل ZIP با فرمت `username - date - tweet_id.zip` می‌سازد |
-| ~~**یوتیوب**~~ | `scripts/youtube/single.sh` و `playlist.sh` و `channel.sh` | با کیفیت انتخابی کاربر، پشتیبانی از `--use-postprocessor` برای دور زدن محدودیت‌ها |
+| **یوتیوب** | `scripts/youtube/single.sh` و `playlist.sh` و `channel.sh` | با کیفیت انتخابی کاربر، پشتیبانی از `--use-postprocessor` برای دور زدن محدودیت‌ها |
 | **اینستاگرام** | `scripts/instagram/single.sh`, `story.sh`, `profile.sh` | نیاز به `INSTAGRAM_COOKIES` دارد. پست، استوری (۲۴ ساعت اخیر) و آخرین N پست پروفایل را دانلود می‌کند |
 | **تیکتاک** | `scripts/tiktok/single.sh` | با استفاده از `yt-dlp`، ویدیو را با فرمت `%(uploader)s - %(title)s.%(ext)s` دانلود می‌کند |
 
