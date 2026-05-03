@@ -13,7 +13,7 @@ This README is available in Persian. Please click on the badge above to view it.
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![GitHub Actions](https://img.shields.io/badge/GitHub%20Actions-Workflow-blue)](https://github.com/features/actions)
 
-A powerful tool that uses GitHub Actions to download content from **SoundCloud, Twitter (X), YouTube, Instagram, and TikTok** directly into your repository. Just paste your links, choose a quality, and let it run.
+A powerful tool that uses GitHub Actions to download content from **SoundCloud, Twitter (X), ~~YouTube, Instagram,~~ and TikTok** directly into your repository. Just paste your links, choose a quality, and let it run.
 > **⚠️ Notice:** YouTube and Instagram downloads are temporarily disabled due to recent API changes. Other platforms (SoundCloud, Twitter, TikTok) work normally. We are working on a fix.
 ## ✨ Features
 
