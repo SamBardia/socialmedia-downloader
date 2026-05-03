@@ -28,7 +28,7 @@ download_tracks_to_dir() {
     local album_name=$(basename "$dest_dir")
     echo "Downloading album: $album_name to $dest_dir"
     
-    local temp_dir="${album_name}_temp"
+    local temp_dir="${album_name} Album"
     mkdir -p "$temp_dir"
     cd "$temp_dir" || exit 1
     
