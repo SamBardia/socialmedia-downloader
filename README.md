@@ -1,7 +1,8 @@
 <div dir="ltr">
 
 # 🌍 Social Media Downloader
-[![فارسی](https://img.shields.io/badge/lang-فارسی-blue.svg)](README.fa.md)This README is available in Persian. Please click on the badge above to view it.
+[![فارسی](https://img.shields.io/badge/lang-فارسی-blue.svg)](README.fa.md)
+This README is available in Persian. Please click on the badge above to view it.
 
 ---
 
