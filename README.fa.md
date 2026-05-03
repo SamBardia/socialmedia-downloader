@@ -93,7 +93,7 @@ downloads/
 | :--- | :--- | :--- |
 | **ساوندکلاود** | `scripts/soundcloud/single.sh` و `album.sh` | تک آهنگ به صورت `Artist - Title.mp3` و آلبوم/پلی‌لیست به صورت `آلبوم.zip` شامل ترک‌های شماره‌گذاری شده |
 | **توییتر (X)** | `scripts/twitter/single.sh` | فقط توییت‌های دارای رسانه را پردازش می‌کند و یک فایل ZIP با فرمت `username - date - tweet_id.zip` می‌سازد |
-| **یوتیوب** | `scripts/youtube/single.sh` و `playlist.sh` و `channel.sh` | با کیفیت انتخابی کاربر، پشتیبانی از `--use-postprocessor` برای دور زدن محدودیت‌ها |
+| ~~**یوتیوب**~~ | `scripts/youtube/single.sh` و `playlist.sh` و `channel.sh` | با کیفیت انتخابی کاربر، پشتیبانی از `--use-postprocessor` برای دور زدن محدودیت‌ها |
 | **اینستاگرام** | `scripts/instagram/single.sh`, `story.sh`, `profile.sh` | نیاز به `INSTAGRAM_COOKIES` دارد. پست، استوری (۲۴ ساعت اخیر) و آخرین N پست پروفایل را دانلود می‌کند |
 | **تیکتاک** | `scripts/tiktok/single.sh` | با استفاده از `yt-dlp`، ویدیو را با فرمت `%(uploader)s - %(title)s.%(ext)s` دانلود می‌کند |
 
