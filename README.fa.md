@@ -59,7 +59,7 @@
 4.  یک فرم باز می‌شود که باید آن را پر کنید:
     - **Enter URLs (one per line):** لینک‌های خود را وارد کنید (هر لینک در یک خط). مثال:
     - https://soundcloud.com/artist/sets/album
-    - https://www.youtube.com/watch?v=XXXXX
+    - ~~https://www.youtube.com/watch?v=XXXX~~
     - https://x.com/user/status/123456
     - **YouTube quality (for video entries):** کیفیت دانلود برای لینک‌های یوتیوب را انتخاب کنید (پیش‌فرض `480p`).
 - بقیه گزینه‌ها (تعداد توییت‌های پروفایل توییتر، تعداد پست‌های اینستاگرام و تعداد ویدیوهای کانال یوتیوب) اختیاری هستند.
