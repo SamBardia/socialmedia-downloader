@@ -70,7 +70,7 @@ To use the YouTube downloader, you must provide your browser cookies. This helps
 After a few minutes (depending on the file sizes), the downloaded files will appear in the `downloads/` folder of your repository.
 
 ## 📂 Output File Structure
-
+````
 downloads/
 ├── soundcloud/
 │ ├── Artist - Track Name.mp3 (single track)
@@ -87,7 +87,7 @@ downloads/
 │ └── username - last 10 posts.zip
 └── tiktok/
 └── username - Video Title.mp4
-
+````
 ## ⚙️ Platform Scripts & Behavior
 
 | Platform | Script File | Behavior |
