@@ -1,7 +1,7 @@
 #!/bin/bash
 # ============================================
-# Twitter profile last N tweets downloader
-# Downloads all tweets (with or without media) from a profile
+# Twitter thread downloader
+# Downloads all tweets in a thread (with or without media)
 # ============================================
 
 if [ -f "config/twitter.conf" ]; then
@@ -10,59 +10,58 @@ fi
 
 DOWNLOAD_PATH="${DOWNLOAD_PATH:-downloads/twitter}"
 URL="$1"
-COUNT="${2:-20}"
-
-# Limit to 50 tweets maximum
-[ "$COUNT" -gt 50 ] && COUNT=50
 
 # Extract username from URL
-USERNAME=$(echo "$URL" | sed -n 's|https://x\.com/\([^/]*\).*|\1|p')
+USERNAME=$(echo "$URL" | grep -oP 'x\.com/\K[^/]+')
 if [ -z "$USERNAME" ]; then
-    USERNAME=$(echo "$URL" | sed -n 's|https://twitter\.com/\([^/]*\).*|\1|p')
+    USERNAME=$(echo "$URL" | grep -oP 'twitter\.com/\K[^/]+')
 fi
 if [ -z "$USERNAME" ]; then
     echo "ERROR: Could not extract username from URL"
     exit 1
 fi
 USERNAME=$(echo "$USERNAME" | tr '[:upper:]' '[:lower:]' | sed 's/[^a-z0-9_]//g')
+[ -z "$USERNAME" ] && USERNAME="unknown"
+
+# Extract tweet ID from URL
+TWEET_ID=$(echo "$URL" | grep -oP 'status/\K[0-9]+')
+if [ -z "$TWEET_ID" ]; then
+    echo "ERROR: Could not extract tweet ID from URL"
+    exit 1
+fi
 
 mkdir -p "$DOWNLOAD_PATH"
 cd "$DOWNLOAD_PATH"
 
 # Handle duplicate ZIP files
-BASE_NAME="${USERNAME} - last ${COUNT} tweets"
+BASE_NAME="${USERNAME} - ${TWEET_ID} - thread"
 FINAL_ZIP_NAME="${BASE_NAME}.zip"
-CNT=1
+COUNT=1
 while [ -f "$FINAL_ZIP_NAME" ]; do
-    FINAL_ZIP_NAME="${BASE_NAME}(${CNT}).zip"
-    CNT=$((CNT + 1))
+    FINAL_ZIP_NAME="${BASE_NAME}(${COUNT}).zip"
+    COUNT=$((COUNT + 1))
 done
 
 TEMP_DIR="${FINAL_ZIP_NAME%.zip}"
 mkdir -p "$TEMP_DIR"
 cd "$TEMP_DIR"
 
-# Get list of tweet URLs from profile
-echo "Fetching last $COUNT tweets from @$USERNAME..."
-python3 -m yt_dlp --flat-playlist --playlist-end "$COUNT" --dump-json "https://x.com/${USERNAME}" 2>/dev/null | jq -r '.entries[]?.url' > tweet_urls.txt
+# Get thread tweet IDs
+echo "Fetching thread tweets..."
+python3 -m yt_dlp --flat-playlist --dump-json "$URL" 2>/dev/null | jq -r '.entries[]?.id' > thread_ids.txt
 
-TOTAL_TWEETS=$(wc -l < tweet_urls.txt)
-echo "Found $TOTAL_TWEETS tweets"
+TOTAL_TWEETS=$(wc -l < thread_ids.txt)
+echo "Found $TOTAL_TWEETS tweets in thread"
 
 INDEX=1
-while read -r tweet_url; do
-    [ -z "$tweet_url" ] && continue
+while read -r tid; do
+    [ -z "$tid" ] && continue
     
-    # Extract tweet ID
-    TWEET_ID=$(echo "$tweet_url" | grep -oP 'status/\K[0-9]+')
-    if [ -z "$TWEET_ID" ]; then
-        continue
-    fi
-    
-    echo "Processing tweet $INDEX of $TOTAL_TWEETS: $TWEET_ID"
+    TWEET_URL="https://x.com/${USERNAME}/status/${tid}"
+    echo "Processing tweet $INDEX of $TOTAL_TWEETS: $tid"
     
     # Get metadata
-    METADATA=$(python3 -m yt_dlp --skip-download --dump-json "$tweet_url" 2>/dev/null)
+    METADATA=$(python3 -m yt_dlp --skip-download --dump-json "$TWEET_URL" 2>/dev/null)
     
     # Check if tweet has media
     HAS_MEDIA=false
@@ -104,7 +103,7 @@ while read -r tweet_url; do
     [ -z "$VIEW_COUNT" ] || [ "$VIEW_COUNT" = "null" ] && VIEW_COUNT="N/A"
     
     # Create folder for this tweet
-    TWEET_FOLDER="${INDEX} - ${USERNAME} - ${TWEET_DATE} - ${TWEET_ID}"
+    TWEET_FOLDER="${INDEX} - ${USERNAME} - ${TWEET_DATE} - ${tid}"
     mkdir -p "$TWEET_FOLDER"
     cd "$TWEET_FOLDER" || exit 1
     
@@ -113,11 +112,11 @@ while read -r tweet_url; do
     
     # Save metadata
     {
-        echo "Tweet ID: $TWEET_ID"
+        echo "Tweet ID: $tid"
         echo "Author: $USERNAME"
         echo "Date: $TWEET_DATE"
         echo "Time: $TWEET_TIME"
-        echo "URL: $tweet_url"
+        echo "URL: $TWEET_URL"
         echo "Has Media: $HAS_MEDIA"
         echo ""
         echo "--- Stats ---"
@@ -136,7 +135,7 @@ while read -r tweet_url; do
             --no-abort-on-error \
             --restrict-filenames \
             --output "media_%(playlist_index)02d.%(ext)s" \
-            "$tweet_url" 2>/dev/null
+            "$TWEET_URL" 2>/dev/null
         
         # Rename media files sequentially
         MEDIA_COUNTER=1
@@ -152,7 +151,7 @@ while read -r tweet_url; do
     
     cd ..
     INDEX=$((INDEX + 1))
-done < tweet_urls.txt
+done < thread_ids.txt
 
 cd ..
 
@@ -160,7 +159,7 @@ cd ..
 if [ -d "$TEMP_DIR" ] && [ "$(ls -A "$TEMP_DIR" 2>/dev/null)" ]; then
     zip -r "$FINAL_ZIP_NAME" "$TEMP_DIR"
     rm -rf "$TEMP_DIR"
-    echo "SUCCESS: Profile saved as $FINAL_ZIP_NAME"
+    echo "SUCCESS: Thread saved as $FINAL_ZIP_NAME"
     ls -la "$FINAL_ZIP_NAME"
 else
     echo "ERROR: No tweets were downloaded"
