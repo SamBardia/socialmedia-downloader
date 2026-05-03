@@ -7,6 +7,7 @@ on:
         description: 'Enter URLs (one per line)'
         required: true
         type: string
+      # YouTube is temporarily disabled - will be re-enabled later
       # youtube_quality:
       #   description: 'YouTube quality (for video entries)'
       #   required: false
@@ -26,11 +27,12 @@ on:
         required: false
         default: '20'
         type: string
-      instagram_profile_count:
-        description: 'Number of posts for Instagram profile (max 30)'
-        required: false
-        default: '10'
-        type: string
+      # Instagram is temporarily disabled - will be re-enabled later
+      # instagram_profile_count:
+      #   description: 'Number of posts for Instagram profile (max 30)'
+      #   required: false
+      #   default: '10'
+      #   type: string
       youtube_channel_count:
         description: 'Number of videos for YouTube channel (max 50)'
         required: false
@@ -118,28 +120,10 @@ jobs:
                 fi
                 ;;
               youtube)
-                # Create cookie file for YouTube
-                echo "$YOUTUBE_COOKIES" > /tmp/yt_cookies.txt
-                
-                if [[ "$URL" == *"list="* ]]; then
-                  ./scripts/youtube/playlist.sh "$URL" "${{ github.event.inputs.youtube_quality }}" "/tmp/yt_cookies.txt"
-                elif [[ "$URL" == *"/channel/"* ]] || [[ "$URL" == *"/@"* ]]; then
-                  ./scripts/youtube/channel.sh "$URL" "${{ github.event.inputs.youtube_channel_count }}" "${{ github.event.inputs.youtube_quality }}" "/tmp/yt_cookies.txt"
-                else
-                  ./scripts/youtube/single.sh "$URL" "${{ github.event.inputs.youtube_quality }}" "/tmp/yt_cookies.txt"
-                fi
-                
-                # Clean up
-                rm -f /tmp/yt_cookies.txt
+                echo "⚠️ YouTube download is temporarily disabled. Check back later."
                 ;;
               instagram)
-                if [[ "$URL" == *"/stories/"* ]] || [[ "$URL" == *"/story/"* ]]; then
-                  ./scripts/instagram/story.sh "$URL"
-                elif [[ "$URL" == *"/p/"* ]] || [[ "$URL" == *"/reel/"* ]]; then
-                  ./scripts/instagram/single.sh "$URL"
-                else
-                  ./scripts/instagram/profile.sh "$URL" "${{ github.event.inputs.instagram_profile_count }}"
-                fi
+                echo "⚠️ Instagram download is temporarily disabled. Check back later."
                 ;;
               tiktok)
                 ./scripts/tiktok/single.sh "$URL"
