@@ -109,9 +109,20 @@ Yes. Instagram requires `INSTAGRAM_COOKIES` to access profile content, stories, 
 
 Ideas, issues, and pull requests are welcome! Please use the [Issues page](https://github.com/BakerStreetBoys/socialmedia-downloader/issues) for discussions.
 
-## ⚠️ Disclaimer
+## ⚠️ Legal Disclaimer
 
-This tool is for **educational purposes** and **personal archiving** of content you have the right to access. Please respect copyright laws and the terms of service of each platform before using it. The developer assumes no responsibility for misuse.
+**By using this tool, you accept full responsibility for your actions.**
+
+1.  **Educational Purpose Only:** This project was created solely for **educational purposes** and to demonstrate automation and download infrastructure concepts.
+2.  **Personal Liability:** Any use of this tool to download copyrighted material without permission from the rights holder is **strictly illegal**. The **end user** assumes all legal liability, including any fines, penalties, or lawsuits.
+3.  **Developer Liability:** The project developer(s) (individual or organization) has no control over what users choose to download and accepts **no responsibility** for any misuse of this tool.
+4.  **GitHub Liability:** GitHub, as a code hosting platform, is also not responsible for the tool's functionality or how it is used.
+5.  **Your Obligations:** By using this project, you agree that you will:
+    - Only download content you own or have explicit permission to download.
+    - Comply with all applicable copyright laws and the Terms of Service of each platform (YouTube, SoundCloud, Instagram, etc.).
+    - Otherwise, you are solely liable and accountable.
+
+**THIS TOOL IS PROVIDED "AS IS", WITHOUT ANY WARRANTIES, EXPRESS OR IMPLIED.**
 
 ## 📄 License
 
