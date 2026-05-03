@@ -88,6 +88,28 @@ downloads/
 └── tiktok/
 └── username - Video Title.mp4
 ````
+## 💡 Recommendations for Best Results
+
+### SoundCloud
+- Use **direct links** (e.g., `https://soundcloud.com/artist/track`) instead of short links (`on.soundcloud.com/...`).  
+  Short links may cause platform detection issues in some cases.
+- For albums or playlists, use links containing `/sets/` (e.g., `https://soundcloud.com/artist/sets/album-name`).
+
+### Twitter (X)
+- Use the main URL format: `https://x.com/username/status/...` or `https://twitter.com/username/status/...`.  
+  Short links (`t.co`) are automatically resolved but may be slower.
+
+### TikTok
+- Use standard TikTok video URLs (e.g., `https://www.tiktok.com/@username/video/...`).  
+  Short links (`vm.tiktok.com`) are also supported.
+
+### General Tips
+- **One link per line** when using the `Run workflow` form.
+- Avoid mixing multiple links on the same line unless separated by spaces or commas.
+- If a download fails, check the link format first, then try again after a few minutes.
+
+> ✅ Following these recommendations will increase the success rate of your downloads.
+
 ## ⚙️ Platform Scripts & Behavior
 
 | Platform | Script File | Behavior |
