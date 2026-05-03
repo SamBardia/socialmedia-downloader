@@ -1,8 +1,14 @@
 <div dir="ltr">
 
-# 🌍 Universal Social Media Downloader
+# 🌍 Social Media Downloader
 
-[![فارسی](https://img.shields.io/badge/lang-فارسی-blue.svg)](README.fa.md)
+[![فارسی](https://img.shields.io/badge/語言-فارسی-blue.svg)](README.fa.md)
+
+This README is available in Persian. Please click on the badge above to view it.
+
+---
+
+**For English speakers:** The main documentation is in Persian. For any questions, please open an issue.
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![GitHub Actions](https://img.shields.io/badge/GitHub%20Actions-Workflow-blue)](https://github.com/features/actions)
