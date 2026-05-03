@@ -7,20 +7,20 @@ on:
         description: 'Enter URLs (one per line)'
         required: true
         type: string
-      youtube_quality:
-        description: 'YouTube quality (for video entries)'
-        required: false
-        default: '480p'
-        type: choice
-        options:
-          - '144p'
-          - '240p'
-          - '360p'
-          - '480p'
-          - '720p'
-          - '1080p'
-          - 'best'
-          - 'audio'
+      # youtube_quality:
+      #   description: 'YouTube quality (for video entries)'
+      #   required: false
+      #   default: '480p'
+      #   type: choice
+      #   options:
+      #     - '144p'
+      #     - '240p'
+      #     - '360p'
+      #     - '480p'
+      #     - '720p'
+      #     - '1080p'
+      #     - 'best'
+      #     - 'audio'
       twitter_profile_count:
         description: 'Number of tweets for Twitter profile (max 50)'
         required: false
