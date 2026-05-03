@@ -108,6 +108,9 @@ jobs:
               soundcloud)
                 if [[ "$URL" == *"/sets/"* ]]; then
                   ./scripts/soundcloud/album.sh "$URL"
+                elif [[ "$URL" =~ ^https?://soundcloud\.com/[^/]+/?$ ]]; then
+                  echo "Artist profile detected. Downloading full archive."
+                  ./scripts/soundcloud/artist.sh "$URL"
                 else
                   ./scripts/soundcloud/single.sh "$URL"
                 fi
