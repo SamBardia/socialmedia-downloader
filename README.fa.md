@@ -2,8 +2,8 @@
 
 # 🌍 دانلودر جامع شبکه‌های اجتماعی
 
-<a href="https://github.com/BakerStreetBoys/socialmedia-downloader/blob/main/README.fa.md">فارسی</a>
-<a href="https://github.com/BakerStreetBoys/socialmedia-downloader/blob/main/README.md">English</a>
+
+[فارسی](https://github.com/BakerStreetBoys/socialmedia-downloader/edit/main/README.fa.md)     [English](https://github.com/BakerStreetBoys/socialmedia-downloader/edit/main/README.md)
 
 [![مجوز: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![GitHub Actions](https://img.shields.io/badge/GitHub%20Actions-Workflow-blue)](https://github.com/features/actions)
