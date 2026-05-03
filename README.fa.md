@@ -61,7 +61,7 @@
     - https://soundcloud.com/artist/sets/album
     - ~~https://www.youtube.com/watch?v=XXXX~~
     - https://x.com/user/status/123456
-    - **YouTube quality (for video entries):** کیفیت دانلود برای لینک‌های یوتیوب را انتخاب کنید (پیش‌فرض `480p`).
+    - ~~**YouTube quality (for video entries):** کیفیت دانلود برای لینک‌های یوتیوب را انتخاب کنید (پیش‌فرض `480p`).~~
 - بقیه گزینه‌ها (تعداد توییت‌های پروفایل توییتر، تعداد پست‌های اینستاگرام و تعداد ویدیوهای کانال یوتیوب) اختیاری هستند.
 5.  روی دکمه سبز **Run workflow** کلیک کنید.
 
