@@ -66,8 +66,9 @@
 پس از چند دقیقه (بسته به حجم فایل‌ها)، فایل‌های دانلود شده در پوشه `downloads/` مخزن شما ظاهر می‌شوند.
 
 ## 📂 ساختار خروجی فایل‌ها
-<span dir="ltr">
-````
+<div dir="ltr">
+    
+text````
 downloads/
 ├── soundcloud/
 │ ├── Artist - Track Name.mp3 (single track)
@@ -84,8 +85,9 @@ downloads/
 │ └── username - last 10 posts.zip
 └── tiktok/
 └── username - Video Title.mp4
-````
-</span>
+    
+text````
+</div>
 
 ## ⚙️ پلتفرم‌ها و رفتار اسکریپت‌ها
 
