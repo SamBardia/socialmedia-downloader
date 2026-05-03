@@ -2,7 +2,7 @@
 
 # 🌍 Universal Social Media Downloader
 
-[![PER](https://img.shields.io/badge/lang-فارسی-blue.svg)](README.fa.md)
+[![فارسی](https://img.shields.io/badge/lang-فارسی-blue.svg)](README.fa.md)
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![GitHub Actions](https://img.shields.io/badge/GitHub%20Actions-Workflow-blue)](https://github.com/features/actions)
