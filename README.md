@@ -1,8 +1,10 @@
-<div dir="rtl">
-# 🌍 Social Media Downloader
-[![فارسی](https://img.shields.io/badge/lang-فارسی-blue.svg)](README.fa.md)
-</div>
 <div>
+
+# 🌍 Social Media Downloader
+
+<a href="https://github.com/BakerStreetBoys/socialmedia-downloader/blob/main/README.fa.md">PERSIAN</a> <a href="https://github.com/BakerStreetBoys/socialmedia-downloader/blob/main/README.md">ENGLISH</a>
+
+
 This README is available in Persian. Please click on the badge above to view it.
 
 ---
