@@ -75,9 +75,6 @@ downloads/
 │ └── Album Name.zip (album with numbered tracks)
 ├── twitter/
 │ └── username - YYYY-MM-DD - tweet_id.zip (includes tweet text, metadata, and media)
-````
-<del>
-````
 ├── youtube/
 │ ├── Video Title (480p).mp4
 │ ├── Video Title (BEST).mp4
@@ -86,10 +83,6 @@ downloads/
 │ ├── post_xxxxxx.mp4
 │ ├── story_username_xxxxxx.mp4
 │ └── username - last 10 posts.zip
-````
-</del>
-
-````
 └── tiktok/
 └── username - Video Title.mp4
 ````
