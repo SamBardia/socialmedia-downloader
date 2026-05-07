@@ -44,22 +44,30 @@ jobs:
           INSTAGRAM_COOKIES: ${{ secrets.INSTAGRAM_COOKIES }}
           TWITTER_PROFILE_COUNT: ${{ github.event.inputs.twitter_profile_count }}
         run: |
+          # Process each URL one by one
           IFS=$'\n'
           for URL in $(echo "${{ github.event.inputs.urls }}" | tr ',' '\n' | tr ' ' '\n' | sed 's/^[[:space:]]*//;s/[[:space:]]*$//'); do
             [ -z "$URL" ] && continue
             ./scripts/downloader-core.sh "$URL"
+            
+            # After each download, update links (to keep order based on latest modification)
+            ./scripts/create_links.sh
+            
+            # Push after each download to avoid large batches
+            git config user.name "github-actions[bot]"
+            git config user.email "github-actions[bot]@users.noreply.github.com"
+            git add downloads/ Links.md Links.fa.md
+            git diff --cached --quiet || git commit -m "Add downloaded content and update links [skip ci]"
+            git pull --rebase origin main || true
+            git push
           done
 
-      - name: Create download links
-        run: |
-          ./scripts/create_links.sh
-
-      - name: Push to repository
+      - name: Final push (in case of any remaining changes)
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add downloads/ Links.md Links.fa.md
-          git diff --cached --quiet || git commit -m "Add downloaded content and update links [skip ci]"
+          git diff --cached --quiet || git commit -m "Final update of downloaded content [skip ci]"
           git pull --rebase origin main || true
           git push
 
