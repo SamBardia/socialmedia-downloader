@@ -2,8 +2,7 @@
 
 # 🌍 Social Media Downloader
 
-[فارسی](https://github.com/BakerStreetBoys/socialmedia-downloader/blob/main/README.fa.md)    [English](https://github.com/BakerStreetBoys/socialmedia-downloader/blob/main/README.md)
-
+[فارسی](https://github.com/BakerStreetBoys/socialmedia-downloader/blob/main/README.fa.md)    English
 This README is available in Persian. Please click on the badge above to view it.
 
 ---
