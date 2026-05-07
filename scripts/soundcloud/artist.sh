@@ -45,10 +45,9 @@ while IFS= read -r LINK; do
         echo "  -> Processing single: $LINK"
         # Download the track into the Singles folder
         (cd ../../.. && ./scripts/soundcloud/single.sh "$LINK")
-        # Find the most recently downloaded mp3 file in the main soundcloud folder
+        # Find the most recently downloaded mp3 file
         NEW_FILE=$(find "../../" -name "*.mp3" -type f -printf '%T@ %p\n' 2>/dev/null | sort -nr | head -1 | cut -d' ' -f2-)
         if [ -n "$NEW_FILE" ] && [ -f "$NEW_FILE" ]; then
-            # Move it to Singles folder
             mv "$NEW_FILE" "Singles/"
         fi
     fi
@@ -69,7 +68,7 @@ while IFS= read -r ALBUM_LINK; do
         TARGET_ALBUM_DIR="Albums/${ALBUM_SAFE}"
         mkdir -p "$TARGET_ALBUM_DIR"
 
-        # Call album.sh with the target directory (inside MASTER_DIR)
+        # Call album.sh with the target directory
         (cd ../../.. && ./scripts/soundcloud/album.sh "$ALBUM_LINK" "$TARGET_ALBUM_DIR")
     fi
 done < album_links.txt
@@ -77,17 +76,28 @@ done < album_links.txt
 # Clean up temporary files
 rm -f raw_data.json single_links.txt album_links.txt
 
-# --- Go back and create ZIP ---
+# --- Go back and create ZIP with splitting ---
 cd ..
 
-# Remove any existing zip with same name to avoid duplication
-rm -f "${ARTIST_USERNAME} - Full Archive.zip"
+# Remove any existing zip with same name
+rm -f "${ARTIST_USERNAME} - Full Archive.zip"*
 
-# Create final ZIP from MASTER_DIR
-zip -r "${ARTIST_USERNAME} - Full Archive.zip" "$MASTER_DIR"
+# Calculate total size and decide split or not
+TOTAL_SIZE=$(du -sb "$MASTER_DIR" | cut -f1)
+MAX_SIZE_BYTES=$((MAX_ZIP_SIZE_MB * 1024 * 1024))
 
-# Optional: remove MASTER_DIR after zipping (to save space)
+BASE_ZIP_NAME="${ARTIST_USERNAME} - Full Archive.zip"
+
+if [ "$SPLIT_LARGE_FILES" = "true" ] && [ "$TOTAL_SIZE" -gt "$MAX_SIZE_BYTES" ]; then
+    echo "Total size exceeds ${MAX_ZIP_SIZE_MB}MB, splitting ZIP into parts"
+    zip -s "${MAX_ZIP_SIZE_MB}m" -r "$BASE_ZIP_NAME" "$MASTER_DIR"
+else
+    echo "Creating single ZIP archive"
+    zip -r "$BASE_ZIP_NAME" "$MASTER_DIR"
+fi
+
+# Clean up
 rm -rf "$MASTER_DIR"
 
-echo "SUCCESS: Full artist archive saved as ${ARTIST_USERNAME} - Full Archive.zip"
-ls -la "${ARTIST_USERNAME} - Full Archive.zip"
+echo "SUCCESS: Full artist archive saved as ${BASE_ZIP_NAME}"
+ls -la "${BASE_ZIP_NAME}"*
