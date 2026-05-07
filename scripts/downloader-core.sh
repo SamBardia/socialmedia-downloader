@@ -17,48 +17,45 @@ URL="$1"
 mkdir -p "$DOWNLOAD_BASE"
 mkdir -p "$DOWNLOAD_BASE/files"
 
-# Function to download a direct file URL
+# Function to download a direct file URL (no temp folder)
 download_direct_file() {
     local file_url="$1"
     local filename=$(basename "$file_url" | cut -d'?' -f1)
-    local temp_dir="$DOWNLOAD_BASE/files/temp_$$"
-    
-    mkdir -p "$temp_dir"
-    cd "$temp_dir" || exit 1
+    local target_dir="$DOWNLOAD_BASE/files"
+    local target_file="$target_dir/$filename"
     
     echo "Downloading direct file: $filename"
-    wget --timeout=30 --tries=3 --progress=dot:giga "$file_url" 2>&1 | \
+    
+    # Download directly to target location
+    wget --timeout=30 --tries=3 --progress=dot:giga -O "$target_file" "$file_url" 2>&1 | \
         awk '/[0-9]+%/ {printf "\rProgress: %s", $0} END {print ""}'
     
     # Check if download was successful
-    if [ ! -f "$filename" ]; then
+    if [ ! -f "$target_file" ]; then
         echo "ERROR: Failed to download $filename"
-        cd ../..
-        rm -rf "$temp_dir"
         return 1
     fi
     
     # Get file size
-    local file_size=$(stat -c%s "$filename" 2>/dev/null || stat -f%z "$filename" 2>/dev/null)
+    local file_size=$(stat -c%s "$target_file" 2>/dev/null || stat -f%z "$target_file" 2>/dev/null)
     local max_size_bytes=$((MAX_ZIP_SIZE_MB * 1024 * 1024))
     
-    # Move file to downloads/files
-    cd ../..
-    
+    # If file is large, split it
     if [ "$SPLIT_LARGE_FILES" = "true" ] && [ "$file_size" -gt "$max_size_bytes" ]; then
         echo "File exceeds ${MAX_ZIP_SIZE_MB}MB, splitting into parts"
-        cd "$temp_dir"
         local base_name="${filename%.*}"
+        local temp_dir="$target_dir/temp_split_$$"
+        mkdir -p "$temp_dir"
+        mv "$target_file" "$temp_dir/"
+        cd "$temp_dir"
         zip -s "${MAX_ZIP_SIZE_MB}m" "${base_name}.zip" "$filename"
         rm -f "$filename"
-        mv "${base_name}.zip"* "../../files/"
-        cd ../..
-    else
-        mv "$temp_dir/$filename" "files/$filename"
+        mv "${base_name}.zip"* "$target_dir/"
+        cd - > /dev/null
+        rm -rf "$temp_dir"
     fi
     
-    rm -rf "$temp_dir"
-    echo "SUCCESS: Saved to downloads/files/$filename"
+    echo "SUCCESS: Saved to $target_file"
     return 0
 }
 
@@ -75,8 +72,7 @@ detect_platform() {
         echo "instagram"
     elif [[ "$url" == *"tiktok.com"* ]] || [[ "$url" == *"vm.tiktok.com"* ]] || [[ "$url" == *"vt.tiktok.com"* ]]; then
         echo "tiktok"
-    elif [[ "$url" =~ ^https?://[^/]+/[^/]+\.(zip|mp3|mp4|jpg|png|pdf|apk)$ ]] || \
-         [[ "$url" =~ ^https?://[^/]+/.*\.[a-zA-Z0-9]{2,4}(\?.*)?$ ]]; then
+    elif [[ "$url" =~ ^https?://[^/]+/.+\.[a-zA-Z0-9]{2,4}(\?.*)?$ ]]; then
         echo "direct"
     else
         echo "unknown"
