@@ -9,7 +9,7 @@ DOWNLOAD_BASE="downloads"
 LINKS_FILE="Links.md"
 LINKS_FILE_FA="Links.fa.md"
 
-# Helper: URL encode a string (RFC 3986)
+# Helper: URL encode only special characters (keep slashes and parentheses as is)
 url_encode() {
     local string="$1"
     local strlen=${#string}
@@ -19,8 +19,17 @@ url_encode() {
     for (( pos=0 ; pos<strlen ; pos++ )); do
         c=${string:$pos:1}
         case "$c" in
-            [-_.~a-zA-Z0-9]) 
+            [-_.~a-zA-Z0-9])
                 o="${c}"
+                ;;
+            '/')
+                o="/"
+                ;;
+            '(')
+                o="("
+                ;;
+            ')')
+                o=")"
                 ;;
             *)
                 printf -v o '%%%02X' "'$c"
@@ -34,9 +43,9 @@ url_encode() {
 # Helper: convert file path to raw GitHub URL
 get_raw_url() {
     local file_path="$1"
-    # Clean the path: remove leading ./, newlines, carriage returns
-    file_path=$(printf "%s" "$file_path" | sed 's|^\./||' | tr -d '\n\r')
-    # URL encode special characters (spaces, parentheses, etc.)
+    # Clean the path: remove leading ./, newlines, carriage returns, and trim spaces
+    file_path=$(printf "%s" "$file_path" | sed 's|^\./||' | tr -d '\n\r' | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')
+    # URL encode the path (keeping slashes and parentheses as is)
     local encoded_path=$(url_encode "$file_path")
     echo "https://github.com/${GITHUB_REPOSITORY}/raw/main/${encoded_path}"
 }
