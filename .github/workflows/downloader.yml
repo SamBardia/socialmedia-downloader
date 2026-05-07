@@ -7,37 +7,11 @@ on:
         description: 'Enter URLs (one per line)'
         required: true
         type: string
-      # YouTube is temporarily disabled - will be re-enabled later
-      # youtube_quality:
-      #   description: 'YouTube quality (for video entries)'
-      #   required: false
-      #   default: '480p'
-      #   type: choice
-      #   options:
-      #     - '144p'
-      #     - '240p'
-      #     - '360p'
-      #     - '480p'
-      #     - '720p'
-      #     - '1080p'
-      #     - 'best'
-      #     - 'audio'
       twitter_profile_count:
         description: 'Number of tweets for Twitter profile (max 50)'
         required: false
         default: '20'
         type: string
-      # Instagram is temporarily disabled - will be re-enabled later
-      # instagram_profile_count:
-      #   description: 'Number of posts for Instagram profile (max 30)'
-      #   required: false
-      #   default: '10'
-      #   type: string
-      # youtube_channel_count:
-      #   description: 'Number of videos for YouTube channel (max 50)'
-      #   required: false
-      #   default: '10'
-      #   type: string
 
 jobs:
   download:
@@ -48,30 +22,17 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Install Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: '20'
-
       - name: Install dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y ffmpeg zip jq
-          pip uninstall -y yt-dlp || true
-          pip install --upgrade --pre yt-dlp[default]
-
-      - name: Setup PO Token Provider
-        run: |
-          docker run -d --name bgutil-provider -p 4416:4416 brainicism/bgutil-ytdlp-pot-provider:latest
-          sleep 5
-          echo "BGUTIL_PROVIDER=http://localhost:4416" >> $GITHUB_ENV
+          sudo apt-get install -y ffmpeg zip jq bc
+          pip install yt-dlp
 
       - name: Process URLs
         env:
           YOUTUBE_COOKIES: ${{ secrets.YOUTUBE_COOKIES }}
           INSTAGRAM_COOKIES: ${{ secrets.INSTAGRAM_COOKIES }}
         run: |
-          # Helper to detect platform
           # Make all scripts executable
           chmod +x scripts/soundcloud/*.sh
           chmod +x scripts/twitter/*.sh
@@ -137,12 +98,17 @@ jobs:
             esac
           done
 
+      - name: Create download links
+        run: |
+          chmod +x scripts/create_links.sh
+          ./scripts/create_links.sh
+
       - name: Push to repository
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add downloads/
-          git diff --cached --quiet || git commit -m "Add downloaded content [skip ci]"
+          git add downloads/ Links.md Links.fa.md
+          git diff --cached --quiet || git commit -m "Add downloaded content and update links [skip ci]"
           git pull --rebase origin main || true
           git push
 
