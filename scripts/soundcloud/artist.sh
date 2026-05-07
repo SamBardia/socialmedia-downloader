@@ -1,6 +1,6 @@
 #!/bin/bash
 # ============================================
-# SoundCloud Full Artist Archive Downloader - Final Version
+# SoundCloud Full Artist Archive Downloader - Fixed
 # ============================================
 
 if [ -f "config/soundcloud.conf" ]; then
@@ -13,7 +13,7 @@ SPLIT_LARGE_FILES="${SPLIT_LARGE_FILES:-true}"
 
 URL="$1"
 
-# Clean artist name from URL (this is the username)
+# Clean artist name from URL
 ARTIST_URL=$(echo "$URL" | sed 's:/*$::')
 ARTIST_USERNAME=$(basename "$ARTIST_URL")
 ARTIST_USERNAME=$(echo "$ARTIST_USERNAME" | sed 's/[\/\\:*?"<>|]/_/g' | sed 's/[[:space:]]\+/_/g')
@@ -23,7 +23,9 @@ echo "Processing Artist: $ARTIST_USERNAME"
 mkdir -p "$DOWNLOAD_PATH"
 cd "$DOWNLOAD_PATH" || exit 1
 
+# Create the master directory (will be zipped)
 MASTER_DIR="${ARTIST_USERNAME}"
+rm -rf "$MASTER_DIR"  # Clean previous run
 mkdir -p "$MASTER_DIR"
 cd "$MASTER_DIR" || exit 1
 
@@ -33,6 +35,7 @@ yt-dlp --flat-playlist --dump-json "$ARTIST_URL" > raw_data.json 2>/dev/null
 
 # --- Download Singles ---
 echo "Downloading singles..."
+mkdir -p "Singles"
 
 # Extract all non-album track URLs
 grep -oP '(?<="url": ")[^"]+' raw_data.json | grep -v '/sets/' > single_links.txt
@@ -40,12 +43,13 @@ grep -oP '(?<="url": ")[^"]+' raw_data.json | grep -v '/sets/' > single_links.tx
 while IFS= read -r LINK; do
     if [ -n "$LINK" ]; then
         echo "  -> Processing single: $LINK"
-        # Call single.sh from project root
+        # Download the track into the Singles folder
         (cd ../../.. && ./scripts/soundcloud/single.sh "$LINK")
-        # Find the most recently downloaded mp3 file
-        NEW_FILE=$(find "../../$DOWNLOAD_PATH" -name "*.mp3" -type f -printf '%T@ %p\n' 2>/dev/null | sort -nr | head -1 | cut -d' ' -f2-)
+        # Find the most recently downloaded mp3 file in the main soundcloud folder
+        NEW_FILE=$(find "../../" -name "*.mp3" -type f -printf '%T@ %p\n' 2>/dev/null | sort -nr | head -1 | cut -d' ' -f2-)
         if [ -n "$NEW_FILE" ] && [ -f "$NEW_FILE" ]; then
-            mv "$NEW_FILE" ./
+            # Move it to Singles folder
+            mv "$NEW_FILE" "Singles/"
         fi
     fi
 done < single_links.txt
@@ -61,12 +65,11 @@ while IFS= read -r ALBUM_LINK; do
     if [ -n "$ALBUM_LINK" ]; then
         ALBUM_RAW=$(echo "$ALBUM_LINK" | sed 's|.*/sets/||')
         ALBUM_SAFE=$(echo "$ALBUM_RAW" | sed 's/[\/\\:*?"<>|]/_/g' | sed 's/[[:space:]]\+/_/g')
-
         echo "  -> Processing album: $ALBUM_SAFE"
         TARGET_ALBUM_DIR="Albums/${ALBUM_SAFE}"
         mkdir -p "$TARGET_ALBUM_DIR"
 
-        # Call album.sh with the target directory
+        # Call album.sh with the target directory (inside MASTER_DIR)
         (cd ../../.. && ./scripts/soundcloud/album.sh "$ALBUM_LINK" "$TARGET_ALBUM_DIR")
     fi
 done < album_links.txt
@@ -74,20 +77,17 @@ done < album_links.txt
 # Clean up temporary files
 rm -f raw_data.json single_links.txt album_links.txt
 
-# --- Go back to download directory and create ZIP ---
+# --- Go back and create ZIP ---
 cd ..
 
-BASE_ZIP_NAME="${ARTIST_USERNAME} - Full Archive.zip"
-FINAL_ZIP_NAME="$BASE_ZIP_NAME"
-COUNT=1
-while [ -f "$FINAL_ZIP_NAME" ]; do
-    FINAL_ZIP_NAME="${ARTIST_USERNAME} - Full Archive(${COUNT}).zip"
-    COUNT=$((COUNT + 1))
-done
+# Remove any existing zip with same name to avoid duplication
+rm -f "${ARTIST_USERNAME} - Full Archive.zip"
 
-echo "Creating final archive: $FINAL_ZIP_NAME"
-zip -r "$FINAL_ZIP_NAME" "$MASTER_DIR"
+# Create final ZIP from MASTER_DIR
+zip -r "${ARTIST_USERNAME} - Full Archive.zip" "$MASTER_DIR"
+
+# Optional: remove MASTER_DIR after zipping (to save space)
 rm -rf "$MASTER_DIR"
 
-echo "SUCCESS: Full artist archive saved as $FINAL_ZIP_NAME"
-ls -la "$FINAL_ZIP_NAME"
+echo "SUCCESS: Full artist archive saved as ${ARTIST_USERNAME} - Full Archive.zip"
+ls -la "${ARTIST_USERNAME} - Full Archive.zip"
