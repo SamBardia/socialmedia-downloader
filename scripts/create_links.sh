@@ -1,7 +1,7 @@
 #!/bin/bash
 # ============================================
 # Create Links.md (English & Persian)
-# with direct download links for all files
+# with direct download links (inline)
 # Newest files appear at the top
 # ============================================
 
@@ -55,34 +55,30 @@ get_time() {
     date +"%Y-%m-%d %H:%M:%S"
 }
 
-# Find all files (including subdirectories) and sort by modification time (newest first)
+# Find all files and sort by modification time (newest first)
 find "$DOWNLOAD_BASE" -type f ! -path "*/\.*" | while read -r file; do
     echo "$(stat -c %Y "$file" 2>/dev/null || stat -f %m "$file" 2>/dev/null):$file"
 done | sort -rn | cut -d: -f2- > /tmp/files_list.txt
 
 # Initialize markdown files (overwrite)
 # English version
-cat > "$LINKS_FILE" <<EOF
+cat > "$LINKS_FILE" <<'EOF'
 # 📦 Download Links (UTC)
 
-This file contains direct download links for every file in the \`downloads/\` folder.
+This file contains direct download links for every file in the `downloads/` folder.
 All timestamps are in **UTC (Greenwich Mean Time)**.
 
-| File | Platform | Size | Published (UTC) | Link |
-|------|----------|------|----------------|------|
 EOF
 
 # Persian version (RTL)
-cat > "$LINKS_FILE_FA" <<EOF
+cat > "$LINKS_FILE_FA" <<'EOF'
 <div dir="rtl">
 
 # 📦 لینک‌های دانلود (به وقت تهران)
 
-این فایل شامل لینک‌های مستقیم دانلود برای تمام فایل‌های موجود در پوشهٔ \`downloads/\` است.
+این فایل شامل لینک‌های مستقیم دانلود برای تمام فایل‌های موجود در پوشهٔ `downloads/` است.
 همهٔ زمان‌ها بر اساس **منطقهٔ زمانی تهران** تنظیم شده‌اند.
 
-| نام فایل | پلتفرم | حجم | زمان انتشار (تهران) | لینک |
-|----------|--------|------|----------------------|------|
 EOF
 
 # Process each file (newest first)
@@ -103,22 +99,31 @@ while read -r file; do
     
     raw_url=$(get_raw_url "$file")
     
-    # Append to English table (UTC)
-    printf "| %s | %s | %s | %s | [Download](%s) |\n" \
-        "$filename" "$platform" "$size_fmt" "$time_utc" "$raw_url" >> "$LINKS_FILE"
+    # Append to English file (inline link)
+    {
+        echo "- **${filename}**"
+        echo "  - **Platform**: ${platform}"
+        echo "  - **Size**: ${size_fmt}"
+        echo "  - **Published (UTC)**: ${time_utc}"
+        echo "  - **Link**: [${filename}](${raw_url})"
+        echo ""
+    } >> "$LINKS_FILE"
     
-    # Append to Persian table (Tehran, RTL)
-    printf "| %s | %s | %s | %s | [دانلود](%s) |\n" \
-        "$filename" "$platform" "$size_fmt" "$time_tehran" "$raw_url" >> "$LINKS_FILE_FA"
+    # Append to Persian file (inline link, RTL)
+    {
+        echo "- **${filename}**"
+        echo "  - **پلتفرم**: ${platform}"
+        echo "  - **حجم**: ${size_fmt}"
+        echo "  - **زمان انتشار (تهران)**: ${time_tehran}"
+        echo "  - **لینک**: [${filename}](${raw_url})"
+        echo ""
+    } >> "$LINKS_FILE_FA"
     
     echo "Added link for: $filename ($platform)"
 done < /tmp/files_list.txt
 
 # Close RTL div for Persian file
-echo "" >> "$LINKS_FILE_FA"
 echo "</div>" >> "$LINKS_FILE_FA"
 
 rm -f /tmp/files_list.txt
-echo "" >> "$LINKS_FILE"
-echo "" >> "$LINKS_FILE_FA"
 echo "✅ Links created: $LINKS_FILE and $LINKS_FILE_FA (newest first)"
