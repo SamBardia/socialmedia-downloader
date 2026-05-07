@@ -9,18 +9,26 @@ DOWNLOAD_BASE="downloads"
 LINKS_FILE="Links.md"
 LINKS_FILE_FA="Links.fa.md"
 
-# Helper: URL encode special characters (only essential ones)
+# Helper: URL encode a string (RFC 3986)
 url_encode() {
-    local str="$1"
-    # First, replace spaces with %20
-    str=${str// /%20}
-    # Then replace parentheses (for filenames like "ft. Poori")
-    str=${str//(/%(}
-    str=${str//)/%)}
-    # Replace backslashes and newlines (safety)
-    str=${str//\\/}
-    str=${str//$'\n'/}
-    echo "$str"
+    local string="$1"
+    local strlen=${#string}
+    local encoded=""
+    local pos c o
+
+    for (( pos=0 ; pos<strlen ; pos++ )); do
+        c=${string:$pos:1}
+        case "$c" in
+            [-_.~a-zA-Z0-9]) 
+                o="${c}"
+                ;;
+            *)
+                printf -v o '%%%02X' "'$c"
+                ;;
+        esac
+        encoded+="${o}"
+    done
+    echo "$encoded"
 }
 
 # Helper: convert file path to raw GitHub URL
@@ -28,7 +36,7 @@ get_raw_url() {
     local file_path="$1"
     # Clean the path: remove leading ./, newlines, carriage returns
     file_path=$(printf "%s" "$file_path" | sed 's|^\./||' | tr -d '\n\r')
-    # URL encode the path
+    # URL encode special characters (spaces, parentheses, etc.)
     local encoded_path=$(url_encode "$file_path")
     echo "https://github.com/${GITHUB_REPOSITORY}/raw/main/${encoded_path}"
 }
@@ -77,7 +85,7 @@ TEMP_DIR=$(mktemp -d)
 SORTED_DATA="$TEMP_DIR/sorted_data.txt"
 > "$SORTED_DATA"
 
-# Collect all files with their modification time (newest first)
+# Collect all files with their modification time
 while IFS= read -r file; do
     # Skip the link files themselves
     if [[ "$file" == "$LINKS_FILE" ]] || [[ "$file" == "$LINKS_FILE_FA" ]]; then
@@ -90,13 +98,12 @@ while IFS= read -r file; do
     fi
 done < <(find "$DOWNLOAD_BASE" -type f ! -path "*/\.*" 2>/dev/null)
 
-# Sort by modification time (newest first) and process
+# Sort by modification time (newest first)
 if [ -f "$TEMP_DIR/all_files.txt" ]; then
     sort -rn "$TEMP_DIR/all_files.txt" | while IFS=: read -r timestamp file; do
         [ -z "$file" ] && continue
         
         filename=$(basename "$file")
-        # Use printf to safely get size without trailing spaces
         size=$(stat -c%s "$file" 2>/dev/null || stat -f%z "$file" 2>/dev/null)
         size_fmt=$(format_size "$size")
         platform=$(get_platform "$file")
@@ -106,7 +113,7 @@ if [ -f "$TEMP_DIR/all_files.txt" ]; then
         
         raw_url=$(get_raw_url "$file")
         
-        # Store in a clean file (printf ensures no extra characters)
+        # Store in a clean file
         printf "%s|%s|%s|%s|%s|%s\n" \
             "$filename" "$platform" "$size_fmt" "$time_utc" "$time_tehran" "$raw_url" >> "$SORTED_DATA"
     done
