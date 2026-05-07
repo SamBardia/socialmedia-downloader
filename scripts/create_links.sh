@@ -1,7 +1,7 @@
 #!/bin/bash
 # ============================================
 # Create Links.md (English & Persian)
-# with direct download links (inline)
+# with direct download links in table format
 # Newest files appear at the top
 # ============================================
 
@@ -13,7 +13,9 @@ LINKS_FILE_FA="Links.fa.md"
 get_raw_url() {
     local file_path="$1"
     file_path="${file_path#./}"
-    echo "https://github.com/${GITHUB_REPOSITORY}/raw/main/${file_path}"
+    # URL encode spaces and special characters (simplified)
+    encoded_path=$(echo "$file_path" | sed 's/ /%20/g' | sed 's/(/%28/g' | sed 's/)/%29/g')
+    echo "https://github.com/${GITHUB_REPOSITORY}/raw/main/${encoded_path}"
 }
 
 # Helper: format file size
@@ -28,7 +30,7 @@ format_size() {
     fi
 }
 
-# Helper: get file extension and determine platform
+# Helper: get platform from file path
 get_platform() {
     local file_path="$1"
     if [[ "$file_path" == *"/soundcloud/"* ]]; then
@@ -48,19 +50,43 @@ get_platform() {
     fi
 }
 
-# Helper: get current time in a given timezone
+# Helper: get current time in given timezone
 get_time() {
     local tz="$1"
     export TZ="$tz"
     date +"%Y-%m-%d %H:%M:%S"
 }
 
-# Find all files and sort by modification time (newest first)
-find "$DOWNLOAD_BASE" -type f ! -path "*/\.*" | while read -r file; do
-    echo "$(stat -c %Y "$file" 2>/dev/null || stat -f %m "$file" 2>/dev/null):$file"
-done | sort -rn | cut -d: -f2- > /tmp/files_list.txt
+# Collect all files with their modification time
+files_list=""
+while IFS= read -r file; do
+    # Skip the link files themselves
+    if [[ "$file" == "$LINKS_FILE" ]] || [[ "$file" == "$LINKS_FILE_FA" ]]; then
+        continue
+    fi
+    mtime=$(stat -c %Y "$file" 2>/dev/null || stat -f %m "$file" 2>/dev/null)
+    files_list="${files_list}${mtime}:${file}\n"
+done < <(find "$DOWNLOAD_BASE" -type f ! -path "*/\.*")
 
-# Initialize markdown files (overwrite)
+# Sort by modification time (newest first) and process
+echo "$files_list" | sort -rn | while IFS=: read -r timestamp file; do
+    [ -z "$file" ] && continue
+    
+    filename=$(basename "$file")
+    size=$(stat -c%s "$file" 2>/dev/null || stat -f%z "$file" 2>/dev/null)
+    size_fmt=$(format_size "$size")
+    platform=$(get_platform "$file")
+    
+    time_utc=$(get_time "UTC")
+    time_tehran=$(get_time "Asia/Tehran")
+    
+    raw_url=$(get_raw_url "$file")
+    
+    # Store data in temporary file for later use
+    echo "$filename|$platform|$size_fmt|$time_utc|$time_tehran|$raw_url" >> /tmp/links_data.txt
+done
+
+# Initialize markdown files with table headers
 # English version
 cat > "$LINKS_FILE" <<'EOF'
 # 📦 Download Links (UTC)
@@ -68,6 +94,8 @@ cat > "$LINKS_FILE" <<'EOF'
 This file contains direct download links for every file in the `downloads/` folder.
 All timestamps are in **UTC (Greenwich Mean Time)**.
 
+| # | File | Platform | Size | Published (UTC) | Link |
+|---|------|----------|------|----------------|------|
 EOF
 
 # Persian version (RTL)
@@ -79,51 +107,29 @@ cat > "$LINKS_FILE_FA" <<'EOF'
 این فایل شامل لینک‌های مستقیم دانلود برای تمام فایل‌های موجود در پوشهٔ `downloads/` است.
 همهٔ زمان‌ها بر اساس **منطقهٔ زمانی تهران** تنظیم شده‌اند.
 
+| # | نام فایل | پلتفرم | حجم | زمان انتشار (تهران) | لینک |
+|---|----------|--------|------|----------------------|------|
 EOF
 
-# Process each file (newest first)
-while read -r file; do
-    # Skip the link files themselves
-    if [[ "$file" == "$LINKS_FILE" ]] || [[ "$file" == "$LINKS_FILE_FA" ]]; then
-        continue
-    fi
-
-    filename=$(basename "$file")
-    size=$(stat -c%s "$file" 2>/dev/null || stat -f%z "$file" 2>/dev/null)
-    size_fmt=$(format_size "$size")
-    platform=$(get_platform "$file")
-    
-    # Times
-    time_utc=$(get_time "UTC")
-    time_tehran=$(get_time "Asia/Tehran")
-    
-    raw_url=$(get_raw_url "$file")
-    
-    # Append to English file (inline link)
-    {
-        echo "- **${filename}**"
-        echo "  - **Platform**: ${platform}"
-        echo "  - **Size**: ${size_fmt}"
-        echo "  - **Published (UTC)**: ${time_utc}"
-        echo "  - **Link**: [${filename}](${raw_url})"
-        echo ""
-    } >> "$LINKS_FILE"
-    
-    # Append to Persian file (inline link, RTL)
-    {
-        echo "- **${filename}**"
-        echo "  - **پلتفرم**: ${platform}"
-        echo "  - **حجم**: ${size_fmt}"
-        echo "  - **زمان انتشار (تهران)**: ${time_tehran}"
-        echo "  - **لینک**: [${filename}](${raw_url})"
-        echo ""
-    } >> "$LINKS_FILE_FA"
-    
-    echo "Added link for: $filename ($platform)"
-done < /tmp/files_list.txt
+# Process stored data and add to markdown files
+counter=1
+if [ -f /tmp/links_data.txt ]; then
+    while IFS='|' read -r filename platform size_fmt time_utc time_tehran raw_url; do
+        # English table row
+        printf "| %d | %s | %s | %s | %s | [Download](%s) |\n" \
+            "$counter" "$filename" "$platform" "$size_fmt" "$time_utc" "$raw_url" >> "$LINKS_FILE"
+        
+        # Persian table row (RTL compatible)
+        printf "| %d | %s | %s | %s | %s | [دانلود](%s) |\n" \
+            "$counter" "$filename" "$platform" "$size_fmt" "$time_tehran" "$raw_url" >> "$LINKS_FILE_FA"
+        
+        counter=$((counter + 1))
+    done < /tmp/links_data.txt
+    rm -f /tmp/links_data.txt
+fi
 
 # Close RTL div for Persian file
+echo "" >> "$LINKS_FILE_FA"
 echo "</div>" >> "$LINKS_FILE_FA"
 
-rm -f /tmp/files_list.txt
 echo "✅ Links created: $LINKS_FILE and $LINKS_FILE_FA (newest first)"
