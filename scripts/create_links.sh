@@ -9,12 +9,27 @@ DOWNLOAD_BASE="downloads"
 LINKS_FILE="Links.md"
 LINKS_FILE_FA="Links.fa.md"
 
+# Helper: URL encode special characters (only essential ones)
+url_encode() {
+    local str="$1"
+    # First, replace spaces with %20
+    str=${str// /%20}
+    # Then replace parentheses (for filenames like "ft. Poori")
+    str=${str//(/%(}
+    str=${str//)/%)}
+    # Replace backslashes and newlines (safety)
+    str=${str//\\/}
+    str=${str//$'\n'/}
+    echo "$str"
+}
+
 # Helper: convert file path to raw GitHub URL
 get_raw_url() {
     local file_path="$1"
-    file_path="${file_path#./}"
-    # URL encode spaces and special characters (simplified)
-    encoded_path=$(echo "$file_path" | sed 's/ /%20/g' | sed 's/(/%28/g' | sed 's/)/%29/g')
+    # Clean the path: remove leading ./, newlines, carriage returns
+    file_path=$(printf "%s" "$file_path" | sed 's|^\./||' | tr -d '\n\r')
+    # URL encode the path
+    local encoded_path=$(url_encode "$file_path")
     echo "https://github.com/${GITHUB_REPOSITORY}/raw/main/${encoded_path}"
 }
 
@@ -57,37 +72,47 @@ get_time() {
     date +"%Y-%m-%d %H:%M:%S"
 }
 
-# Collect all files with their modification time
-files_list=""
+# Temporary directory for collecting data
+TEMP_DIR=$(mktemp -d)
+SORTED_DATA="$TEMP_DIR/sorted_data.txt"
+> "$SORTED_DATA"
+
+# Collect all files with their modification time (newest first)
 while IFS= read -r file; do
     # Skip the link files themselves
     if [[ "$file" == "$LINKS_FILE" ]] || [[ "$file" == "$LINKS_FILE_FA" ]]; then
         continue
     fi
+    # Get modification time (seconds since epoch)
     mtime=$(stat -c %Y "$file" 2>/dev/null || stat -f %m "$file" 2>/dev/null)
-    files_list="${files_list}${mtime}:${file}\n"
-done < <(find "$DOWNLOAD_BASE" -type f ! -path "*/\.*")
+    if [ -n "$mtime" ]; then
+        printf "%d:%s\n" "$mtime" "$file" >> "$TEMP_DIR/all_files.txt"
+    fi
+done < <(find "$DOWNLOAD_BASE" -type f ! -path "*/\.*" 2>/dev/null)
 
 # Sort by modification time (newest first) and process
-echo "$files_list" | sort -rn | while IFS=: read -r timestamp file; do
-    [ -z "$file" ] && continue
-    
-    filename=$(basename "$file")
-    size=$(stat -c%s "$file" 2>/dev/null || stat -f%z "$file" 2>/dev/null)
-    size_fmt=$(format_size "$size")
-    platform=$(get_platform "$file")
-    
-    time_utc=$(get_time "UTC")
-    time_tehran=$(get_time "Asia/Tehran")
-    
-    raw_url=$(get_raw_url "$file")
-    
-    # Store data in temporary file for later use
-    echo "$filename|$platform|$size_fmt|$time_utc|$time_tehran|$raw_url" >> /tmp/links_data.txt
-done
+if [ -f "$TEMP_DIR/all_files.txt" ]; then
+    sort -rn "$TEMP_DIR/all_files.txt" | while IFS=: read -r timestamp file; do
+        [ -z "$file" ] && continue
+        
+        filename=$(basename "$file")
+        # Use printf to safely get size without trailing spaces
+        size=$(stat -c%s "$file" 2>/dev/null || stat -f%z "$file" 2>/dev/null)
+        size_fmt=$(format_size "$size")
+        platform=$(get_platform "$file")
+        
+        time_utc=$(get_time "UTC")
+        time_tehran=$(get_time "Asia/Tehran")
+        
+        raw_url=$(get_raw_url "$file")
+        
+        # Store in a clean file (printf ensures no extra characters)
+        printf "%s|%s|%s|%s|%s|%s\n" \
+            "$filename" "$platform" "$size_fmt" "$time_utc" "$time_tehran" "$raw_url" >> "$SORTED_DATA"
+    done
+fi
 
-# Initialize markdown files with table headers
-# English version
+# Initialize markdown files with table headers (overwrite)
 cat > "$LINKS_FILE" <<'EOF'
 # 📦 Download Links (UTC)
 
@@ -113,23 +138,33 @@ EOF
 
 # Process stored data and add to markdown files
 counter=1
-if [ -f /tmp/links_data.txt ]; then
+if [ -f "$SORTED_DATA" ]; then
     while IFS='|' read -r filename platform size_fmt time_utc time_tehran raw_url; do
+        # Skip empty lines
+        [ -z "$filename" ] && continue
+        
+        # Ensure raw_url is not empty
+        if [ -z "$raw_url" ] || [ "$raw_url" = " " ]; then
+            raw_url="#"
+        fi
+        
         # English table row
         printf "| %d | %s | %s | %s | %s | [Download](%s) |\n" \
             "$counter" "$filename" "$platform" "$size_fmt" "$time_utc" "$raw_url" >> "$LINKS_FILE"
         
-        # Persian table row (RTL compatible)
+        # Persian table row
         printf "| %d | %s | %s | %s | %s | [دانلود](%s) |\n" \
             "$counter" "$filename" "$platform" "$size_fmt" "$time_tehran" "$raw_url" >> "$LINKS_FILE_FA"
         
         counter=$((counter + 1))
-    done < /tmp/links_data.txt
-    rm -f /tmp/links_data.txt
+    done < "$SORTED_DATA"
 fi
 
 # Close RTL div for Persian file
 echo "" >> "$LINKS_FILE_FA"
 echo "</div>" >> "$LINKS_FILE_FA"
 
-echo "✅ Links created: $LINKS_FILE and $LINKS_FILE_FA (newest first)"
+# Clean up
+rm -rf "$TEMP_DIR"
+
+echo "✅ Links created: $LINKS_FILE and $LINKS_FILE_FA ($((counter-1)) files, newest first)"
