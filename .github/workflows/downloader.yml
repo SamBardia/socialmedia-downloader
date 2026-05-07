@@ -25,82 +25,33 @@ jobs:
       - name: Install dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y ffmpeg zip jq bc
+          sudo apt-get install -y ffmpeg zip jq bc wget
           pip install yt-dlp
+
+      - name: Make scripts executable
+        run: |
+          chmod +x scripts/soundcloud/*.sh 2>/dev/null || true
+          chmod +x scripts/twitter/*.sh 2>/dev/null || true
+          chmod +x scripts/youtube/*.sh 2>/dev/null || true
+          chmod +x scripts/instagram/*.sh 2>/dev/null || true
+          chmod +x scripts/tiktok/*.sh 2>/dev/null || true
+          chmod +x scripts/downloader-core.sh 2>/dev/null || true
+          chmod +x scripts/create_links.sh 2>/dev/null || true
 
       - name: Process URLs
         env:
           YOUTUBE_COOKIES: ${{ secrets.YOUTUBE_COOKIES }}
           INSTAGRAM_COOKIES: ${{ secrets.INSTAGRAM_COOKIES }}
+          TWITTER_PROFILE_COUNT: ${{ github.event.inputs.twitter_profile_count }}
         run: |
-          # Make all scripts executable
-          chmod +x scripts/soundcloud/*.sh
-          chmod +x scripts/twitter/*.sh
-          chmod +x scripts/youtube/*.sh
-          chmod +x scripts/instagram/*.sh
-          chmod +x scripts/tiktok/*.sh
-          
-          detect_platform() {
-              local url="$1"
-              if [[ "$url" == *"soundcloud.com"* ]] || [[ "$url" == *"on.soundcloud.com"* ]] || [[ "$url" == *"snd.sc"* ]]; then
-                  echo "soundcloud"
-              elif [[ "$url" == *"x.com"* ]] || [[ "$url" == *"twitter.com"* ]] || [[ "$url" == *"t.co"* ]]; then
-                  echo "twitter"
-              elif [[ "$url" == *"youtu.be"* ]] || [[ "$url" == *"youtube.com"* ]] || [[ "$url" == *"m.youtube.com"* ]]; then
-                  echo "youtube"
-              elif [[ "$url" == *"instagram.com"* ]] || [[ "$url" == *"instagr.am"* ]] || [[ "$url" == *"ig.me"* ]]; then
-                  echo "instagram"
-              elif [[ "$url" == *"tiktok.com"* ]] || [[ "$url" == *"vm.tiktok.com"* ]] || [[ "$url" == *"vt.tiktok.com"* ]]; then
-                  echo "tiktok"
-              else
-                  echo "unknown"
-              fi
-          }
-
           IFS=$'\n'
           for URL in $(echo "${{ github.event.inputs.urls }}" | tr ',' '\n' | tr ' ' '\n' | sed 's/^[[:space:]]*//;s/[[:space:]]*$//'); do
             [ -z "$URL" ] && continue
-            echo "========================================="
-            echo "Processing: $URL"
-            PLATFORM=$(detect_platform "$URL")
-            echo "Platform: $PLATFORM"
-            
-            case "$PLATFORM" in
-              soundcloud)
-                if [[ "$URL" == *"/sets/"* ]]; then
-                  ./scripts/soundcloud/album.sh "$URL"
-                elif [[ "$URL" =~ ^https?://soundcloud\.com/[^/]+/?$ ]]; then
-                  echo "Artist profile detected. Downloading full archive."
-                  ./scripts/soundcloud/artist.sh "$URL"
-                else
-                  ./scripts/soundcloud/single.sh "$URL"
-                fi
-                ;;
-              twitter)
-                if [[ "$URL" == *"/status/"* ]]; then
-                  ./scripts/twitter/single.sh "$URL"
-                else
-                  ./scripts/twitter/profile.sh "$URL" "${{ github.event.inputs.twitter_profile_count }}"
-                fi
-                ;;
-              youtube)
-                echo "⚠️ YouTube download is temporarily disabled. Check back later."
-                ;;
-              instagram)
-                echo "⚠️ Instagram download is temporarily disabled. Check back later."
-                ;;
-              tiktok)
-                ./scripts/tiktok/single.sh "$URL"
-                ;;
-              *)
-                echo "WARNING: Unsupported platform for $URL"
-                ;;
-            esac
+            ./scripts/downloader-core.sh "$URL"
           done
 
       - name: Create download links
         run: |
-          chmod +x scripts/create_links.sh
           ./scripts/create_links.sh
 
       - name: Push to repository
