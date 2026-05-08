@@ -5,4 +5,4 @@ All timestamps are in **UTC (Greenwich Mean Time)**.
 
 | # | File | Platform | Size | Published (UTC) | Link |
 |---|------|----------|------|----------------|------|
-| 1 | Aliz - SECOND CHANCE.mp3 | SoundCloud | 4.7 MB | 2026-05-08 02:05:57 | [Download](https://github.com/BakerStreetBoys/socialmedia-downloader/raw/main/downloads/soundcloud/Aliz%20-%20SECOND%20CHANCE.mp3) |
+| 1 | Putak - PutaK - Wow (ft. Poori).mp3 | SoundCloud | 2.8 MB | 2026-05-08 02:08:59 | [Download](https://github.com/BakerStreetBoys/socialmedia-downloader/raw/main/downloads%2Fsoundcloud%2FPutak%20-%20PutaK%20-%20Wow%20(ft.%20Poori).mp3) |
