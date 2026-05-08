@@ -1,7 +1,7 @@
 #!/bin/bash
 # ============================================
 # Create Links.md (English & Persian)
-# with direct RAW download links + ?raw=true
+# with direct download links
 # Newest files appear at the top
 # ============================================
 
@@ -9,7 +9,7 @@ DOWNLOAD_BASE="downloads"
 LINKS_FILE="Links.md"
 LINKS_FILE_FA="Links.fa.md"
 
-# Helper: URL encode special characters (keep slashes and parentheses as is)
+# Helper: URL encode special characters (keep slashes as is)
 url_encode() {
     local string="$1"
     local strlen=${#string}
@@ -25,12 +25,6 @@ url_encode() {
             '/')
                 o="/"
                 ;;
-            '(')
-                o="("
-                ;;
-            ')')
-                o=")"
-                ;;
             *)
                 printf -v o '%%%02X' "'$c"
                 ;;
@@ -40,15 +34,14 @@ url_encode() {
     echo "$encoded"
 }
 
-# Helper: convert file path to RAW GitHub URL with ?raw=true for direct download
+# Helper: convert file path to RAW GitHub URL
 get_raw_url() {
     local file_path="$1"
-    # Clean the path: remove leading ./, newlines, carriage returns
+    # Clean the path
     file_path=$(printf "%s" "$file_path" | sed 's|^\./||' | tr -d '\n\r')
-    # URL encode special characters (keeping slashes and parentheses)
     local encoded_path=$(url_encode "$file_path")
-    # Add ?raw=true to force direct download
-    echo "https://github.com/${GITHUB_REPOSITORY}/raw/main/${encoded_path}?raw=true"
+    # Use raw.githubusercontent.com (not github.com/raw)
+    echo "https://raw.githubusercontent.com/${GITHUB_REPOSITORY}/main/${encoded_path}"
 }
 
 # Helper: format file size
@@ -97,11 +90,9 @@ SORTED_DATA="$TEMP_DIR/sorted_data.txt"
 
 # Collect all files with their modification time
 while IFS= read -r file; do
-    # Skip the link files themselves
     if [[ "$file" == "$LINKS_FILE" ]] || [[ "$file" == "$LINKS_FILE_FA" ]]; then
         continue
     fi
-    # Get modification time (seconds since epoch)
     mtime=$(stat -c %Y "$file" 2>/dev/null || stat -f %m "$file" 2>/dev/null)
     if [ -n "$mtime" ]; then
         printf "%d:%s\n" "$mtime" "$file" >> "$TEMP_DIR/all_files.txt"
@@ -114,6 +105,8 @@ if [ -f "$TEMP_DIR/all_files.txt" ]; then
         [ -z "$file" ] && continue
         
         filename=$(basename "$file")
+        # Extra: remove the path from filename for display
+        clean_filename="$filename"
         size=$(stat -c%s "$file" 2>/dev/null || stat -f%z "$file" 2>/dev/null)
         size_fmt=$(format_size "$size")
         platform=$(get_platform "$file")
@@ -121,27 +114,26 @@ if [ -f "$TEMP_DIR/all_files.txt" ]; then
         time_utc=$(get_time "UTC")
         time_tehran=$(get_time "Asia/Tehran")
         
-        # Use RAW URL with ?raw=true for direct download
         raw_url=$(get_raw_url "$file")
         
-        # Store in a clean file
         printf "%s|%s|%s|%s|%s|%s\n" \
-            "$filename" "$platform" "$size_fmt" "$time_utc" "$time_tehran" "$raw_url" >> "$SORTED_DATA"
+            "$clean_filename" "$platform" "$size_fmt" "$time_utc" "$time_tehran" "$raw_url" >> "$SORTED_DATA"
     done
 fi
 
-# Initialize markdown files with table headers (overwrite)
+# Initialize markdown files
 cat > "$LINKS_FILE" <<'EOF'
 # 📦 Download Links (UTC)
 
 This file contains direct download links for every file in the `downloads/` folder.
 All timestamps are in **UTC (Greenwich Mean Time)**.
 
+> **Note:** Click the link to download. Your browser may rename the file; simply rename it back if needed.
+
 | # | File | Platform | Size | Published (UTC) | Link |
 |---|------|----------|------|----------------|------|
 EOF
 
-# Persian version (RTL)
 cat > "$LINKS_FILE_FA" <<'EOF'
 <div dir="rtl">
 
@@ -150,27 +142,21 @@ cat > "$LINKS_FILE_FA" <<'EOF'
 این فایل شامل لینک‌های مستقیم دانلود برای تمام فایل‌های موجود در پوشهٔ `downloads/` است.
 همهٔ زمان‌ها بر اساس **منطقهٔ زمانی تهران** تنظیم شده‌اند.
 
+> **نکته:** روی لینک کلیک کنید تا دانلود شروع شود. ممکن است مرورگر نام فایل را تغییر دهد؛ در صورت نیاز آن را به نام اصلی بازگردانید.
+
 | # | نام فایل | پلتفرم | حجم | زمان انتشار (تهران) | لینک |
 |---|----------|--------|------|----------------------|------|
 EOF
 
-# Process stored data and add to markdown files
 counter=1
 if [ -f "$SORTED_DATA" ]; then
     while IFS='|' read -r filename platform size_fmt time_utc time_tehran raw_url; do
-        # Skip empty lines
         [ -z "$filename" ] && continue
+        [ -z "$raw_url" ] && raw_url="#"
         
-        # Ensure raw_url is not empty
-        if [ -z "$raw_url" ] || [ "$raw_url" = " " ]; then
-            raw_url="#"
-        fi
-        
-        # English table row
         printf "| %d | %s | %s | %s | %s | [Download](%s) |\n" \
             "$counter" "$filename" "$platform" "$size_fmt" "$time_utc" "$raw_url" >> "$LINKS_FILE"
         
-        # Persian table row
         printf "| %d | %s | %s | %s | %s | [دانلود](%s) |\n" \
             "$counter" "$filename" "$platform" "$size_fmt" "$time_tehran" "$raw_url" >> "$LINKS_FILE_FA"
         
@@ -178,12 +164,9 @@ if [ -f "$SORTED_DATA" ]; then
     done < "$SORTED_DATA"
 fi
 
-# Close RTL div for Persian file
 echo "" >> "$LINKS_FILE_FA"
 echo "</div>" >> "$LINKS_FILE_FA"
 
-# Clean up
 rm -rf "$TEMP_DIR"
 
 echo "✅ Links created: $LINKS_FILE and $LINKS_FILE_FA ($((counter-1)) files, newest first)"
-echo "✅ Using RAW URLs with ?raw=true for direct download"
