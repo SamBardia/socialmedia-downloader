@@ -17,24 +17,29 @@ URL="$1"
 mkdir -p "$DOWNLOAD_BASE"
 mkdir -p "$DOWNLOAD_BASE/files"
 
-# Function to download a direct file URL (no temp folder)
+# Function to download a direct file URL using aria2 (like sandbox)
 download_direct_file() {
     local file_url="$1"
     local filename=$(basename "$file_url" | cut -d'?' -f1)
     local target_dir="$DOWNLOAD_BASE/files"
     local target_file="$target_dir/$filename"
+    local temp_dir="tmp_downloads"
+    
+    mkdir -p "$temp_dir"
     
     echo "Downloading direct file: $filename"
-    
-    # Download directly to target location
-    wget --timeout=30 --tries=3 --progress=dot:giga -O "$target_file" "$file_url" 2>&1 | \
-        awk '/[0-9]+%/ {printf "\rProgress: %s", $0} END {print ""}'
+    aria2c --split=2 --max-connection-per-server=2 --dir="$temp_dir" "$file_url"
     
     # Check if download was successful
-    if [ ! -f "$target_file" ]; then
+    if [ ! -f "$temp_dir/$filename" ]; then
         echo "ERROR: Failed to download $filename"
+        rm -rf "$temp_dir"
         return 1
     fi
+    
+    # Move file to target directory
+    mv "$temp_dir/$filename" "$target_file"
+    rm -rf "$temp_dir"
     
     # Get file size
     local file_size=$(stat -c%s "$target_file" 2>/dev/null || stat -f%z "$target_file" 2>/dev/null)
@@ -44,15 +49,15 @@ download_direct_file() {
     if [ "$SPLIT_LARGE_FILES" = "true" ] && [ "$file_size" -gt "$max_size_bytes" ]; then
         echo "File exceeds ${MAX_ZIP_SIZE_MB}MB, splitting into parts"
         local base_name="${filename%.*}"
-        local temp_dir="$target_dir/temp_split_$$"
-        mkdir -p "$temp_dir"
-        mv "$target_file" "$temp_dir/"
-        cd "$temp_dir"
+        local temp_split_dir="$target_dir/temp_split_$$"
+        mkdir -p "$temp_split_dir"
+        mv "$target_file" "$temp_split_dir/"
+        cd "$temp_split_dir"
         zip -s "${MAX_ZIP_SIZE_MB}m" "${base_name}.zip" "$filename"
         rm -f "$filename"
         mv "${base_name}.zip"* "$target_dir/"
         cd - > /dev/null
-        rm -rf "$temp_dir"
+        rm -rf "$temp_split_dir"
     fi
     
     echo "SUCCESS: Saved to $target_file"
