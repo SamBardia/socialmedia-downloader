@@ -7,7 +7,7 @@ if [ -f "config/instagram.conf" ]; then
     source "config/instagram.conf"
 fi
 
-DOWNLOAD_PATH="${DOWNLOAD_PATH:-downloads}"
+DOWNLOAD_PATH="${DOWNLOAD_PATH:-downloads/instagram}"
 URL="$1"
 COUNT="${2:-10}"
 
