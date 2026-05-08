@@ -16,7 +16,7 @@ get_raw_url() {
     local file_path="$1"
     file_path=$(printf "%s" "$file_path" | sed 's|^\./||' | tr -d '\n\r')
     local encoded_path=$(encode_path "$file_path")
-    echo "https://github.com/${GITHUB_REPOSITORY}/raw/main/${encoded_path}"
+    echo "https://github.com/${GITHUB_REPOSITORY}/raw/refs/heads/main/${encoded_path}"
 }
 
 format_size() {
