@@ -7,15 +7,11 @@ DOWNLOAD_BASE="downloads"
 LINKS_FILE="Links.md"
 LINKS_FILE_FA="Links.fa.md"
 
-# Helper: encode only spaces and parentheses, keep slashes and other chars as is
+# Helper: encode ONLY space, keep parentheses and other chars as is
 encode_path() {
     local path="$1"
     # Replace space with %20
     path=$(echo "$path" | sed 's/ /%20/g')
-    # Replace ( with %28
-    path=$(echo "$path" | sed 's/(/%28/g')
-    # Replace ) with %29
-    path=$(echo "$path" | sed 's/)/%29/g')
     echo "$path"
 }
 
@@ -24,7 +20,7 @@ get_raw_url() {
     local file_path="$1"
     # Clean the path: remove leading ./, newlines, carriage returns
     file_path=$(printf "%s" "$file_path" | sed 's|^\./||' | tr -d '\n\r')
-    # Encode only spaces and parentheses
+    # Encode only spaces
     local encoded_path=$(encode_path "$file_path")
     echo "https://raw.githubusercontent.com/${GITHUB_REPOSITORY}/main/${encoded_path}"
 }
@@ -109,7 +105,7 @@ fi
 
 # Initialize markdown files with table headers
 cat > "$LINKS_FILE" <<'EOF'
-# 📦 Download Links (UTC)
+# 📦 Download Links
 
 This file contains direct download links for every file in the `downloads/` folder.
 All timestamps are in **UTC (Greenwich Mean Time)**.
@@ -121,7 +117,7 @@ EOF
 cat > "$LINKS_FILE_FA" <<'EOF'
 <div dir="rtl">
 
-# 📦 لینک‌های دانلود (به وقت تهران)
+# 📦 لینک‌های دانلود
 
 این فایل شامل لینک‌های مستقیم دانلود برای تمام فایل‌های موجود در پوشهٔ `downloads/` است.
 همهٔ زمان‌ها بر اساس **منطقهٔ زمانی تهران** تنظیم شده‌اند.
