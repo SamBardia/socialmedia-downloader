@@ -8,7 +8,7 @@ if [ -f "config/twitter.conf" ]; then
     source "config/twitter.conf"
 fi
 
-DOWNLOAD_PATH="${DOWNLOAD_PATH:-downloads/twitter}"
+DOWNLOAD_PATH="${DOWNLOAD_PATH:-downloads}"
 URL="$1"
 COUNT="${2:-20}"
 
