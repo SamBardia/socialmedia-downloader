@@ -7,7 +7,6 @@
 
 | # | نام فایل | پلتفرم | حجم | زمان انتشار (تهران) | لینک |
 |---|----------|--------|------|----------------------|------|
-| 1 | Putak - PutaK - Wow (ft. Poori).mp3 | SoundCloud | 2.8 MB | 2026-05-08 05:30:50 | [دانلود](https://github.com/BakerStreetBoys/socialmedia-downloader/raw/main/downloads/soundcloud/Putak%20-%20PutaK%20-%20Wow%20%28ft.%20Poori%29.mp3) |
-| 2 | thefeed-client-v0.16.2-windows-amd64.exe | Direct Link | 3.2 MB | 2026-05-08 05:30:50 | [دانلود](https://github.com/BakerStreetBoys/socialmedia-downloader/raw/main/downloads/files/thefeed-client-v0.16.2-windows-amd64.exe) |
+| 1 | Aliz - SECOND CHANCE.mp3 | SoundCloud | 4.7 MB | 2026-05-08 05:35:57 | [دانلود](https://github.com/BakerStreetBoys/socialmedia-downloader/raw/main/downloads/soundcloud/Aliz%20-%20SECOND%20CHANCE.mp3) |
 
 </div>
