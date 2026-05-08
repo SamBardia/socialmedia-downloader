@@ -7,7 +7,7 @@ if [ -f "config/instagram.conf" ]; then
     source "config/instagram.conf"
 fi
 
-DOWNLOAD_PATH="${DOWNLOAD_PATH:-downloads/instagram}"
+DOWNLOAD_PATH="${DOWNLOAD_PATH:-downloads}"
 URL="$1"
 
 [ -n "$INSTAGRAM_COOKIES" ] && { COOKIE_FILE=$(mktemp); echo "$INSTAGRAM_COOKIES" > "$COOKIE_FILE"; } || exit 1
