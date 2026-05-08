@@ -7,7 +7,7 @@ if [ -f "config/youtube.conf" ]; then
     source "config/youtube.conf"
 fi
 
-DOWNLOAD_PATH="${DOWNLOAD_PATH:-downloads/youtube}"
+DOWNLOAD_PATH="${DOWNLOAD_PATH:-downloads}"
 URL="$1"
 QUALITY="${2:-480p}"
 
