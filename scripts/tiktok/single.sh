@@ -7,7 +7,7 @@ if [ -f "config/tiktok.conf" ]; then
     source "config/tiktok.conf"
 fi
 
-DOWNLOAD_PATH="${DOWNLOAD_PATH:-downloads/tiktok}"
+DOWNLOAD_PATH="${DOWNLOAD_PATH:-downloads}"
 URL="$1"
 
 mkdir -p "$DOWNLOAD_PATH"
