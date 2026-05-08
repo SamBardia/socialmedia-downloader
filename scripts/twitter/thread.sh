@@ -8,7 +8,7 @@ if [ -f "config/twitter.conf" ]; then
     source "config/twitter.conf"
 fi
 
-DOWNLOAD_PATH="${DOWNLOAD_PATH:-downloads}"
+DOWNLOAD_PATH="${DOWNLOAD_PATH:-downloads/twitter}"
 URL="$1"
 
 # Extract username from URL
