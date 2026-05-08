@@ -1,24 +1,25 @@
 #!/bin/bash
 # ============================================
-# Create Links.md (English & Persian)
+# Create Links.md (English & Persian) - Final Fix
 # ============================================
 
 DOWNLOAD_BASE="downloads"
 LINKS_FILE="Links.md"
 LINKS_FILE_FA="Links.fa.md"
 
-# Helper: URL encode special characters
+# Helper: URL encode special characters (keep slashes as is, like sandbox)
 url_encode() {
     local string="$1"
     printf '%s' "$string" | jq -sRr @uri
 }
 
-# Helper: convert file path to RAW GitHub URL
+# Helper: convert file path to RAW GitHub URL (using raw.githubusercontent.com)
 get_raw_url() {
     local file_path="$1"
+    # Clean the path and remove leading ./
     file_path=$(printf "%s" "$file_path" | sed 's|^\./||' | tr -d '\n\r')
     local encoded_path=$(url_encode "$file_path")
-    # 🔥 تغییر کلیدی: استفاده از raw.githubusercontent.com
+    # 🔥 تغییر کلیدی: استفاده از raw.githubusercontent.com بدون هیچ پارامتری
     echo "https://raw.githubusercontent.com/${GITHUB_REPOSITORY}/main/${encoded_path}"
 }
 
@@ -91,9 +92,11 @@ if [ -f "$TEMP_DIR/all_files.txt" ]; then
     done
 fi
 
-# Initialize markdown files
+# Initialize markdown files with table headers
 cat > "$LINKS_FILE" <<'EOF'
 # 📦 Download Links (UTC)
+
+This file contains direct download links for every file in the `downloads/` folder.
 
 | # | File | Platform | Size | Published (UTC) | Link |
 |---|------|----------|------|----------------|------|
@@ -103,6 +106,8 @@ cat > "$LINKS_FILE_FA" <<'EOF'
 <div dir="rtl">
 
 # 📦 لینک‌های دانلود (به وقت تهران)
+
+این فایل شامل لینک‌های مستقیم دانلود برای تمام فایل‌های موجود در پوشهٔ `downloads/` است.
 
 | # | نام فایل | پلتفرم | حجم | زمان انتشار (تهران) | لینک |
 |---|----------|--------|------|----------------------|------|
