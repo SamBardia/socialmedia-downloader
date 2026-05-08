@@ -9,7 +9,7 @@ if [ -f "config/youtube.conf" ]; then
     source "config/youtube.conf"
 fi
 
-DOWNLOAD_PATH="${DOWNLOAD_PATH:-downloads/youtube}"
+DOWNLOAD_PATH="${DOWNLOAD_PATH:-downloads}"
 MAX_ZIP_SIZE_MB="${MAX_ZIP_SIZE_MB:-90}"
 SPLIT_LARGE_FILES="${SPLIT_LARGE_FILES:-true}"
 
