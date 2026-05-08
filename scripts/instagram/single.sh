@@ -7,7 +7,7 @@ if [ -f "config/instagram.conf" ]; then
     source "config/instagram.conf"
 fi
 
-DOWNLOAD_PATH="${DOWNLOAD_PATH:-downloads}"
+DOWNLOAD_PATH="${DOWNLOAD_PATH:-downloads/instagram}"
 URL="$1"
 
 [ -n "$INSTAGRAM_COOKIES" ] && { COOKIE_FILE=$(mktemp); echo "$INSTAGRAM_COOKIES" > "$COOKIE_FILE"; } || { echo "Error: Instagram cookies required"; exit 1; }
