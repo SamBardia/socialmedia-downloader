@@ -7,17 +7,11 @@ on:
         description: 'Enter URLs (one per line, or separated by space/comma)'
         required: true
         type: string
-      quality:
-        description: 'Video quality (for YouTube and similar platforms)'
+      twitter_profile_count:
+        description: 'Number of tweets for Twitter profile (max 50)'
         required: false
-        default: '480p'
-        type: choice
-        options:
-          - '480p'
-          - '720p'
-          - '360p'
-          - 'Audio (MP3)'
-          - 'Best'
+        default: '20'
+        type: string
 
 jobs:
   download:
@@ -31,25 +25,18 @@ jobs:
       - name: Install dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y ffmpeg zip jq wget aria2
-
-      - name: Check if yt-dlp is needed
-        id: check
-        run: |
-          NEED_YT=false
-          IFS=$'\n'
-          for URL in $(echo "${{ github.event.inputs.urls }}" | tr ',' '\n' | tr ' ' '\n' | sed 's/^[[:space:]]*//;s/[[:space:]]*$//'); do
-            if [[ "$URL" =~ (youtube\.com|youtu\.be|soundcloud\.com|on\.soundcloud\.com|x\.com|twitter\.com|instagram\.com|tiktok\.com) ]]; then
-              NEED_YT=true
-              break
-            fi
-          done
-          echo "need_yt=$NEED_YT" >> $GITHUB_OUTPUT
-
-      - name: Install yt-dlp (if needed)
-        if: steps.check.outputs.need_yt == 'true'
-        run: |
+          sudo apt-get install -y ffmpeg zip jq bc wget aria2
           pip install yt-dlp
+
+      - name: Make scripts executable
+        run: |
+          chmod +x scripts/soundcloud/*.sh 2>/dev/null || true
+          chmod +x scripts/twitter/*.sh 2>/dev/null || true
+          chmod +x scripts/youtube/*.sh 2>/dev/null || true
+          chmod +x scripts/instagram/*.sh 2>/dev/null || true
+          chmod +x scripts/tiktok/*.sh 2>/dev/null || true
+          chmod +x scripts/downloader-core.sh 2>/dev/null || true
+          chmod +x scripts/create_links.sh 2>/dev/null || true
 
       - name: Setup YouTube Cookies (if exists)
         env:
@@ -64,27 +51,13 @@ jobs:
       - name: Process URLs
         env:
           YOUTUBE_COOKIES: ${{ secrets.YOUTUBE_COOKIES }}
+          INSTAGRAM_COOKIES: ${{ secrets.INSTAGRAM_COOKIES }}
+          TWITTER_PROFILE_COUNT: ${{ github.event.inputs.twitter_profile_count }}
         run: |
-          QUALITY="${{ github.event.inputs.quality }}"
-          
-          # Quality mapping for yt-dlp
-          if [[ "$QUALITY" == "720p" ]]; then
-            YTDLP_F="-f bestvideo[ext=mp4][height<=720]+bestaudio[ext=m4a]/best[ext=mp4][height<=720]/best --merge-output-format mp4"
-          elif [[ "$QUALITY" == "480p" ]]; then
-            YTDLP_F="-f bestvideo[ext=mp4][height<=480]+bestaudio[ext=m4a]/best[ext=mp4][height<=480]/best --merge-output-format mp4"
-          elif [[ "$QUALITY" == "360p" ]]; then
-            YTDLP_F="-f bestvideo[ext=mp4][height<=360]+bestaudio[ext=m4a]/best[ext=mp4][height<=360]/best --merge-output-format mp4"
-          elif [[ "$QUALITY" == "Audio (MP3)" ]]; then
-            YTDLP_F="-x --audio-format mp3"
-          else
-            YTDLP_F="--merge-output-format mp4"
-          fi
-
-          # Temporary directory for downloads
-          rm -rf tmp_downloads
+          # Create temporary download directory
           mkdir -p tmp_downloads
-
-          # Process each URL
+          
+          # Process each URL one by one
           IFS=$'\n'
           for URL in $(echo "${{ github.event.inputs.urls }}" | tr ',' '\n' | tr ' ' '\n' | sed 's/^[[:space:]]*//;s/[[:space:]]*$//'); do
             [ -z "$URL" ] && continue
@@ -92,124 +65,52 @@ jobs:
             echo "Processing: $URL"
             echo "========================================="
             
-            # Platform detection
-            if echo "$URL" | grep -qE "(youtube\.com|youtu\.be|soundcloud\.com|on\.soundcloud\.com|x\.com|twitter\.com|instagram\.com|tiktok\.com)"; then
-              echo "Platform URL → using yt-dlp"
-              COOKIE_ARG=""
-              [ -s youtube_cookies.txt ] && COOKIE_ARG="--cookies youtube_cookies.txt"
-              yt-dlp $COOKIE_ARG $YTDLP_F -o "tmp_downloads/%(title)s.%(ext)s" "$URL"
+            # Detect if it's a platform URL or direct file
+            if [[ "$URL" =~ (youtube\.com|youtu\.be|soundcloud\.com|on\.soundcloud\.com|x\.com|twitter\.com|instagram\.com|tiktok\.com) ]]; then
+              echo "Platform URL → using existing scripts"
+              ./scripts/downloader-core.sh "$URL"
             else
               echo "Direct file → using aria2"
               aria2c --split=2 --max-connection-per-server=2 --dir="tmp_downloads" "$URL"
+              
+              # Move to appropriate folder based on file extension
+              for FILE in tmp_downloads/*; do
+                if [ -f "$FILE" ]; then
+                  FILENAME=$(basename "$FILE")
+                  mkdir -p downloads/files
+                  mv "$FILE" "downloads/files/$FILENAME"
+                fi
+              done
             fi
-          done
-
-      - name: Move files to platform folders
-        run: |
-          # Create platform folders
-          mkdir -p downloads/soundcloud downloads/twitter downloads/youtube downloads/instagram downloads/tiktok downloads/files
-          
-          for FILE in tmp_downloads/*; do
-            [ -f "$FILE" ] || continue
-            FILENAME=$(basename "$FILE")
             
-            # Detect platform from URL or filename (fallback to files folder)
-            if [[ "$FILENAME" == *"youtube"* ]] || [[ "$FILENAME" == *"yt"* ]]; then
-              mv "$FILE" "downloads/youtube/$FILENAME"
-            elif [[ "$FILENAME" == *"soundcloud"* ]] || [[ "$FILENAME" == *"sc"* ]]; then
-              mv "$FILE" "downloads/soundcloud/$FILENAME"
-            elif [[ "$FILENAME" == *"twitter"* ]] || [[ "$FILENAME" == *"x.com"* ]]; then
-              mv "$FILE" "downloads/twitter/$FILENAME"
-            elif [[ "$FILENAME" == *"instagram"* ]] || [[ "$FILENAME" == *"ig"* ]]; then
-              mv "$FILE" "downloads/instagram/$FILENAME"
-            elif [[ "$FILENAME" == *"tiktok"* ]] || [[ "$FILENAME" == *"tt"* ]]; then
-              mv "$FILE" "downloads/tiktok/$FILENAME"
-            else
-              mv "$FILE" "downloads/files/$FILENAME"
-            fi
+            # After each download, update links
+            ./scripts/create_links.sh
+            
+            # Push after each download to avoid large batches
+            git config user.name "github-actions[bot]"
+            git config user.email "github-actions[bot]@users.noreply.github.com"
+            git add downloads/ Links.md Links.fa.md
+            git diff --cached --quiet || git commit -m "Add downloaded content and update links [skip ci]"
+            git pull --rebase origin main || true
+            git push
           done
+          
           rm -rf tmp_downloads
 
-      - name: Zip large files (90MB limit, no password)
-        run: |
-          LIMIT=$((90 * 1024 * 1024))
-          
-          # Find all files in downloads folder and its subfolders
-          find downloads -type f | while read -r FILE; do
-            SIZE=$(stat -c%s "$FILE")
-            BASENAME=$(basename "$FILE")
-            DIR=$(dirname "$FILE")
-            
-            if [ "$SIZE" -gt "$LIMIT" ]; then
-              echo "File is larger than 90MB, splitting: $BASENAME"
-              cd "$DIR"
-              zip -s 90m "${BASENAME}.zip" -j "$BASENAME"
-              rm -f "$BASENAME"
-              cd - > /dev/null
-            fi
-          done
-
-      - name: Update Links.md
-        run: |
-          cat > Links.md << 'EOF'
-# 📦 Download Links
-
-This file contains direct download links for every file in the `downloads/` folder.
-All timestamps are in **UTC (Greenwich Mean Time)**.
-
-| # | File | Platform | Size | Published (UTC) | Link |
-|---|------|----------|------|----------------|------|
-EOF
-
-          REPO="${{ github.repository }}"
-          BRANCH="${GITHUB_REF_NAME}"
-          COUNTER=1
-          
-          # Find all files (including subfolders)
-          find downloads -type f | while read -r FILE; do
-            SIZE=$(stat -c%s "$FILE")
-            SIZE_MB=$(echo "scale=1; $SIZE / 1048576" | bc)
-            SIZE_STR="${SIZE_MB} MB"
-            if (( $(echo "$SIZE_MB < 1" | bc -l) )); then
-              SIZE_KB=$((SIZE / 1024))
-              SIZE_STR="${SIZE_KB} KB"
-            fi
-            
-            # Get relative path and encode
-            REL_PATH="${FILE#./}"
-            ENCODED_PATH=$(python3 -c "import urllib.parse, sys; print(urllib.parse.quote(sys.stdin.read().strip()))" <<< "$REL_PATH")
-            RAW_URL="https://github.com/$REPO/raw/$BRANCH/$ENCODED_PATH"
-            
-            # Determine platform
-            if [[ "$REL_PATH" == *"/soundcloud/"* ]]; then
-              PLATFORM="SoundCloud"
-            elif [[ "$REL_PATH" == *"/twitter/"* ]]; then
-              PLATFORM="Twitter"
-            elif [[ "$REL_PATH" == *"/youtube/"* ]]; then
-              PLATFORM="YouTube"
-            elif [[ "$REL_PATH" == *"/instagram/"* ]]; then
-              PLATFORM="Instagram"
-            elif [[ "$REL_PATH" == *"/tiktok/"* ]]; then
-              PLATFORM="TikTok"
-            elif [[ "$REL_PATH" == *"/files/"* ]]; then
-              PLATFORM="Direct Link"
-            else
-              PLATFORM="Other"
-            fi
-            
-            FILENAME=$(basename "$FILE")
-            TIME_NOW=$(date -u +"%Y-%m-%d %H:%M:%S")
-            
-            printf "| %d | %s | %s | %s | %s | [Download](%s) |\n" \
-              "$COUNTER" "$FILENAME" "$PLATFORM" "$SIZE_STR" "$TIME_NOW" "$RAW_URL" >> Links.md
-            
-            COUNTER=$((COUNTER + 1))
-          done
-
-      - name: Push to repository
+      - name: Final push (in case of any remaining changes)
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add downloads/ Links.md
-          git diff --cached --quiet || git commit -m "Add downloaded content [skip ci]"
+          git add downloads/ Links.md Links.fa.md
+          git diff --cached --quiet || git commit -m "Final update of downloaded content [skip ci]"
+          git pull --rebase origin main || true
           git push
+
+      - name: Display summary
+        run: |
+          echo "========================================="
+          echo "Download summary"
+          echo "========================================="
+          for dir in downloads/*/; do
+            [ -d "$dir" ] && echo "📁 $(basename "$dir"): $(ls -1 "$dir" | wc -l) items"
+          done
