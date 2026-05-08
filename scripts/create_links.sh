@@ -1,6 +1,7 @@
 #!/bin/bash
 # ============================================
 # Create Links.md (English & Persian)
+# Using blob links with download button instruction
 # ============================================
 
 DOWNLOAD_BASE="downloads"
@@ -12,11 +13,12 @@ encode_path() {
     python3 -c "import urllib.parse, sys; print(urllib.parse.quote(sys.stdin.read().strip()))" <<< "$path"
 }
 
-get_raw_url() {
+# Changed: returning blob URL (not raw) -> users click Download button on GitHub page
+get_blob_url() {
     local file_path="$1"
     file_path=$(printf "%s" "$file_path" | sed 's|^\./||' | tr -d '\n\r')
     local encoded_path=$(encode_path "$file_path")
-    echo "https://github.com/${GITHUB_REPOSITORY}/raw/refs/heads/main/${encoded_path}"
+    echo "https://github.com/${GITHUB_REPOSITORY}/blob/main/${encoded_path}"
 }
 
 format_size() {
@@ -78,29 +80,29 @@ if [ -f "$TEMP_DIR/all_files.txt" ]; then
         platform=$(get_platform "$file")
         time_utc=$(get_time "UTC")
         time_tehran=$(get_time "Asia/Tehran")
-        raw_url=$(get_raw_url "$file")
+        blob_url=$(get_blob_url "$file")
         printf "%s|%s|%s|%s|%s|%s\n" \
-            "$filename" "$platform" "$size_fmt" "$time_utc" "$time_tehran" "$raw_url" >> "$SORTED_DATA"
+            "$filename" "$platform" "$size_fmt" "$time_utc" "$time_tehran" "$blob_url" >> "$SORTED_DATA"
     done
 fi
 
+# English file with instruction
 cat > "$LINKS_FILE" <<'EOF'
 # 📦 Download Links
 
-This file contains direct download links for every file in the `downloads/` folder.
-All timestamps are in **UTC (Greenwich Mean Time)**.
+> **How to download:** Click the link, then click the **Download** button on the GitHub page to save the file with its original name.
 
 | # | File | Platform | Size | Published (UTC) | Link |
 |---|------|----------|------|----------------|------|
 EOF
 
+# Persian file with instruction (RTL)
 cat > "$LINKS_FILE_FA" <<'EOF'
 <div dir="rtl">
 
 # 📦 لینک‌های دانلود
 
-این فایل شامل لینک‌های مستقیم دانلود برای تمام فایل‌های موجود در پوشهٔ `downloads/` است.
-همهٔ زمان‌ها بر اساس **منطقهٔ زمانی تهران** تنظیم شده‌اند.
+> **نحوه دانلود:** روی لینک کلیک کنید، سپس در صفحه گیت‌هاب، روی دکمه **Download** کلیک کنید تا فایل با نام اصلی ذخیره شود.
 
 | # | نام فایل | پلتفرم | حجم | زمان انتشار (تهران) | لینک |
 |---|----------|--------|------|----------------------|------|
@@ -108,13 +110,13 @@ EOF
 
 counter=1
 if [ -f "$SORTED_DATA" ]; then
-    while IFS='|' read -r filename platform size_fmt time_utc time_tehran raw_url; do
+    while IFS='|' read -r filename platform size_fmt time_utc time_tehran blob_url; do
         [ -z "$filename" ] && continue
-        [ -z "$raw_url" ] && raw_url="#"
-        printf "| %d | %s | %s | %s | %s | [Download](%s) |\n" \
-            "$counter" "$filename" "$platform" "$size_fmt" "$time_utc" "$raw_url" >> "$LINKS_FILE"
-        printf "| %d | %s | %s | %s | %s | [دانلود](%s) |\n" \
-            "$counter" "$filename" "$platform" "$size_fmt" "$time_tehran" "$raw_url" >> "$LINKS_FILE_FA"
+        [ -z "$blob_url" ] && blob_url="#"
+        printf "| %d | %s | %s | %s | %s | [View](%s) |\n" \
+            "$counter" "$filename" "$platform" "$size_fmt" "$time_utc" "$blob_url" >> "$LINKS_FILE"
+        printf "| %d | %s | %s | %s | %s | [مشاهده](%s) |\n" \
+            "$counter" "$filename" "$platform" "$size_fmt" "$time_tehran" "$blob_url" >> "$LINKS_FILE_FA"
         counter=$((counter + 1))
     done < "$SORTED_DATA"
 fi
