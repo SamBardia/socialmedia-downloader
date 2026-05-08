@@ -1,7 +1,7 @@
 #!/bin/bash
 # ============================================
 # Create Links.md (English & Persian)
-# with direct RAW download links in table format
+# with direct RAW download links + ?raw=true
 # Newest files appear at the top
 # ============================================
 
@@ -40,14 +40,15 @@ url_encode() {
     echo "$encoded"
 }
 
-# Helper: convert file path to RAW GitHub URL (direct download)
+# Helper: convert file path to RAW GitHub URL with ?raw=true for direct download
 get_raw_url() {
     local file_path="$1"
     # Clean the path: remove leading ./, newlines, carriage returns
     file_path=$(printf "%s" "$file_path" | sed 's|^\./||' | tr -d '\n\r')
     # URL encode special characters (keeping slashes and parentheses)
     local encoded_path=$(url_encode "$file_path")
-    echo "https://github.com/${GITHUB_REPOSITORY}/raw/main/${encoded_path}"
+    # Add ?raw=true to force direct download
+    echo "https://github.com/${GITHUB_REPOSITORY}/raw/main/${encoded_path}?raw=true"
 }
 
 # Helper: format file size
@@ -120,7 +121,7 @@ if [ -f "$TEMP_DIR/all_files.txt" ]; then
         time_utc=$(get_time "UTC")
         time_tehran=$(get_time "Asia/Tehran")
         
-        # Use RAW URL for direct download
+        # Use RAW URL with ?raw=true for direct download
         raw_url=$(get_raw_url "$file")
         
         # Store in a clean file
@@ -185,4 +186,4 @@ echo "</div>" >> "$LINKS_FILE_FA"
 rm -rf "$TEMP_DIR"
 
 echo "✅ Links created: $LINKS_FILE and $LINKS_FILE_FA ($((counter-1)) files, newest first)"
-echo "✅ Using RAW URLs with unencoded slashes and parentheses"
+echo "✅ Using RAW URLs with ?raw=true for direct download"
