@@ -1,46 +1,24 @@
 #!/bin/bash
 # ============================================
 # Create Links.md (English & Persian)
-# with direct download links
-# Newest files appear at the top
 # ============================================
 
 DOWNLOAD_BASE="downloads"
 LINKS_FILE="Links.md"
 LINKS_FILE_FA="Links.fa.md"
 
-# Helper: URL encode special characters (keep slashes as is)
+# Helper: URL encode special characters
 url_encode() {
     local string="$1"
-    local strlen=${#string}
-    local encoded=""
-    local pos c o
-
-    for (( pos=0 ; pos<strlen ; pos++ )); do
-        c=${string:$pos:1}
-        case "$c" in
-            [-_.~a-zA-Z0-9])
-                o="${c}"
-                ;;
-            '/')
-                o="/"
-                ;;
-            *)
-                printf -v o '%%%02X' "'$c"
-                ;;
-        esac
-        encoded+="${o}"
-    done
-    echo "$encoded"
+    printf '%s' "$string" | jq -sRr @uri
 }
 
 # Helper: convert file path to RAW GitHub URL
 get_raw_url() {
     local file_path="$1"
-    # Clean the path
     file_path=$(printf "%s" "$file_path" | sed 's|^\./||' | tr -d '\n\r')
     local encoded_path=$(url_encode "$file_path")
-    # Use raw.githubusercontent.com (not github.com/raw)
+    # 🔥 تغییر کلیدی: استفاده از raw.githubusercontent.com
     echo "https://raw.githubusercontent.com/${GITHUB_REPOSITORY}/main/${encoded_path}"
 }
 
@@ -76,19 +54,18 @@ get_platform() {
     fi
 }
 
-# Helper: get current time in given timezone
+# Helper: get current time
 get_time() {
     local tz="$1"
     export TZ="$tz"
     date +"%Y-%m-%d %H:%M:%S"
 }
 
-# Temporary directory for collecting data
+# Collect files sorted by modification time (newest first)
 TEMP_DIR=$(mktemp -d)
 SORTED_DATA="$TEMP_DIR/sorted_data.txt"
 > "$SORTED_DATA"
 
-# Collect all files with their modification time
 while IFS= read -r file; do
     if [[ "$file" == "$LINKS_FILE" ]] || [[ "$file" == "$LINKS_FILE_FA" ]]; then
         continue
@@ -99,36 +76,24 @@ while IFS= read -r file; do
     fi
 done < <(find "$DOWNLOAD_BASE" -type f ! -path "*/\.*" 2>/dev/null)
 
-# Sort by modification time (newest first)
 if [ -f "$TEMP_DIR/all_files.txt" ]; then
     sort -rn "$TEMP_DIR/all_files.txt" | while IFS=: read -r timestamp file; do
         [ -z "$file" ] && continue
-        
         filename=$(basename "$file")
-        # Extra: remove the path from filename for display
-        clean_filename="$filename"
         size=$(stat -c%s "$file" 2>/dev/null || stat -f%z "$file" 2>/dev/null)
         size_fmt=$(format_size "$size")
         platform=$(get_platform "$file")
-        
         time_utc=$(get_time "UTC")
         time_tehran=$(get_time "Asia/Tehran")
-        
         raw_url=$(get_raw_url "$file")
-        
         printf "%s|%s|%s|%s|%s|%s\n" \
-            "$clean_filename" "$platform" "$size_fmt" "$time_utc" "$time_tehran" "$raw_url" >> "$SORTED_DATA"
+            "$filename" "$platform" "$size_fmt" "$time_utc" "$time_tehran" "$raw_url" >> "$SORTED_DATA"
     done
 fi
 
 # Initialize markdown files
 cat > "$LINKS_FILE" <<'EOF'
 # 📦 Download Links (UTC)
-
-This file contains direct download links for every file in the `downloads/` folder.
-All timestamps are in **UTC (Greenwich Mean Time)**.
-
-> **Note:** Click the link to download. Your browser may rename the file; simply rename it back if needed.
 
 | # | File | Platform | Size | Published (UTC) | Link |
 |---|------|----------|------|----------------|------|
@@ -139,11 +104,6 @@ cat > "$LINKS_FILE_FA" <<'EOF'
 
 # 📦 لینک‌های دانلود (به وقت تهران)
 
-این فایل شامل لینک‌های مستقیم دانلود برای تمام فایل‌های موجود در پوشهٔ `downloads/` است.
-همهٔ زمان‌ها بر اساس **منطقهٔ زمانی تهران** تنظیم شده‌اند.
-
-> **نکته:** روی لینک کلیک کنید تا دانلود شروع شود. ممکن است مرورگر نام فایل را تغییر دهد؛ در صورت نیاز آن را به نام اصلی بازگردانید.
-
 | # | نام فایل | پلتفرم | حجم | زمان انتشار (تهران) | لینک |
 |---|----------|--------|------|----------------------|------|
 EOF
@@ -152,14 +112,10 @@ counter=1
 if [ -f "$SORTED_DATA" ]; then
     while IFS='|' read -r filename platform size_fmt time_utc time_tehran raw_url; do
         [ -z "$filename" ] && continue
-        [ -z "$raw_url" ] && raw_url="#"
-        
         printf "| %d | %s | %s | %s | %s | [Download](%s) |\n" \
             "$counter" "$filename" "$platform" "$size_fmt" "$time_utc" "$raw_url" >> "$LINKS_FILE"
-        
         printf "| %d | %s | %s | %s | %s | [دانلود](%s) |\n" \
             "$counter" "$filename" "$platform" "$size_fmt" "$time_tehran" "$raw_url" >> "$LINKS_FILE_FA"
-        
         counter=$((counter + 1))
     done < "$SORTED_DATA"
 fi
@@ -168,5 +124,4 @@ echo "" >> "$LINKS_FILE_FA"
 echo "</div>" >> "$LINKS_FILE_FA"
 
 rm -rf "$TEMP_DIR"
-
 echo "✅ Links created: $LINKS_FILE and $LINKS_FILE_FA ($((counter-1)) files, newest first)"
