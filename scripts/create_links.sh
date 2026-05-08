@@ -1,25 +1,31 @@
 #!/bin/bash
 # ============================================
-# Create Links.md (English & Persian) - Final Fix
+# Create Links.md (English & Persian)
 # ============================================
 
 DOWNLOAD_BASE="downloads"
 LINKS_FILE="Links.md"
 LINKS_FILE_FA="Links.fa.md"
 
-# Helper: URL encode special characters (keep slashes as is, like sandbox)
-url_encode() {
-    local string="$1"
-    printf '%s' "$string" | jq -sRr @uri
+# Helper: encode only spaces and parentheses, keep slashes and other chars as is
+encode_path() {
+    local path="$1"
+    # Replace space with %20
+    path=$(echo "$path" | sed 's/ /%20/g')
+    # Replace ( with %28
+    path=$(echo "$path" | sed 's/(/%28/g')
+    # Replace ) with %29
+    path=$(echo "$path" | sed 's/)/%29/g')
+    echo "$path"
 }
 
-# Helper: convert file path to RAW GitHub URL (using raw.githubusercontent.com)
+# Helper: convert file path to RAW GitHub URL
 get_raw_url() {
     local file_path="$1"
-    # Clean the path and remove leading ./
+    # Clean the path: remove leading ./, newlines, carriage returns
     file_path=$(printf "%s" "$file_path" | sed 's|^\./||' | tr -d '\n\r')
-    local encoded_path=$(url_encode "$file_path")
-    # 🔥 تغییر کلیدی: استفاده از raw.githubusercontent.com بدون هیچ پارامتری
+    # Encode only spaces and parentheses
+    local encoded_path=$(encode_path "$file_path")
     echo "https://raw.githubusercontent.com/${GITHUB_REPOSITORY}/main/${encoded_path}"
 }
 
@@ -55,38 +61,47 @@ get_platform() {
     fi
 }
 
-# Helper: get current time
+# Helper: get current time in given timezone
 get_time() {
     local tz="$1"
     export TZ="$tz"
     date +"%Y-%m-%d %H:%M:%S"
 }
 
-# Collect files sorted by modification time (newest first)
+# Temporary directory for collecting data
 TEMP_DIR=$(mktemp -d)
 SORTED_DATA="$TEMP_DIR/sorted_data.txt"
 > "$SORTED_DATA"
 
+# Collect all files with their modification time
 while IFS= read -r file; do
+    # Skip the link files themselves
     if [[ "$file" == "$LINKS_FILE" ]] || [[ "$file" == "$LINKS_FILE_FA" ]]; then
         continue
     fi
+    # Get modification time (seconds since epoch)
     mtime=$(stat -c %Y "$file" 2>/dev/null || stat -f %m "$file" 2>/dev/null)
     if [ -n "$mtime" ]; then
         printf "%d:%s\n" "$mtime" "$file" >> "$TEMP_DIR/all_files.txt"
     fi
 done < <(find "$DOWNLOAD_BASE" -type f ! -path "*/\.*" 2>/dev/null)
 
+# Sort by modification time (newest first)
 if [ -f "$TEMP_DIR/all_files.txt" ]; then
     sort -rn "$TEMP_DIR/all_files.txt" | while IFS=: read -r timestamp file; do
         [ -z "$file" ] && continue
+        
         filename=$(basename "$file")
         size=$(stat -c%s "$file" 2>/dev/null || stat -f%z "$file" 2>/dev/null)
         size_fmt=$(format_size "$size")
         platform=$(get_platform "$file")
+        
         time_utc=$(get_time "UTC")
         time_tehran=$(get_time "Asia/Tehran")
+        
         raw_url=$(get_raw_url "$file")
+        
+        # Store in a clean file
         printf "%s|%s|%s|%s|%s|%s\n" \
             "$filename" "$platform" "$size_fmt" "$time_utc" "$time_tehran" "$raw_url" >> "$SORTED_DATA"
     done
@@ -97,6 +112,7 @@ cat > "$LINKS_FILE" <<'EOF'
 # 📦 Download Links (UTC)
 
 This file contains direct download links for every file in the `downloads/` folder.
+All timestamps are in **UTC (Greenwich Mean Time)**.
 
 | # | File | Platform | Size | Published (UTC) | Link |
 |---|------|----------|------|----------------|------|
@@ -108,6 +124,7 @@ cat > "$LINKS_FILE_FA" <<'EOF'
 # 📦 لینک‌های دانلود (به وقت تهران)
 
 این فایل شامل لینک‌های مستقیم دانلود برای تمام فایل‌های موجود در پوشهٔ `downloads/` است.
+همهٔ زمان‌ها بر اساس **منطقهٔ زمانی تهران** تنظیم شده‌اند.
 
 | # | نام فایل | پلتفرم | حجم | زمان انتشار (تهران) | لینک |
 |---|----------|--------|------|----------------------|------|
@@ -117,16 +134,29 @@ counter=1
 if [ -f "$SORTED_DATA" ]; then
     while IFS='|' read -r filename platform size_fmt time_utc time_tehran raw_url; do
         [ -z "$filename" ] && continue
+        
+        # Ensure raw_url is not empty
+        if [ -z "$raw_url" ] || [ "$raw_url" = " " ]; then
+            raw_url="#"
+        fi
+        
+        # English table row
         printf "| %d | %s | %s | %s | %s | [Download](%s) |\n" \
             "$counter" "$filename" "$platform" "$size_fmt" "$time_utc" "$raw_url" >> "$LINKS_FILE"
+        
+        # Persian table row
         printf "| %d | %s | %s | %s | %s | [دانلود](%s) |\n" \
             "$counter" "$filename" "$platform" "$size_fmt" "$time_tehran" "$raw_url" >> "$LINKS_FILE_FA"
+        
         counter=$((counter + 1))
     done < "$SORTED_DATA"
 fi
 
+# Close RTL div for Persian file
 echo "" >> "$LINKS_FILE_FA"
 echo "</div>" >> "$LINKS_FILE_FA"
 
+# Clean up
 rm -rf "$TEMP_DIR"
+
 echo "✅ Links created: $LINKS_FILE and $LINKS_FILE_FA ($((counter-1)) files, newest first)"
