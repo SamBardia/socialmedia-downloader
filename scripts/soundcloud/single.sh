@@ -8,7 +8,7 @@ if [ -f "config/soundcloud.conf" ]; then
 fi
 
 AUDIO_FORMAT="${AUDIO_FORMAT:-mp3}"
-DOWNLOAD_PATH="${DOWNLOAD_PATH:-downloads/soundcloud}"
+DOWNLOAD_PATH="${DOWNLOAD_PATH:-downloads}"
 
 URL="$1"
 
