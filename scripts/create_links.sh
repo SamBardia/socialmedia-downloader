@@ -9,7 +9,7 @@ LINKS_FILE_FA="Links.fa.md"
 
 encode_path() {
     local path="$1"
-    python3 -c "import urllib.parse, sys; print(urllib.parse.quote(sys.stdin.read().strip(), safe='()'))" <<< "$path"
+    python3 -c "import urllib.parse, sys; print(urllib.parse.quote(sys.stdin.read().strip()))" <<< "$path"
 }
 
 get_raw_url() {
