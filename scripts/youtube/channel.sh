@@ -7,7 +7,7 @@ if [ -f "config/youtube.conf" ]; then
     source "config/youtube.conf"
 fi
 
-DOWNLOAD_PATH="${DOWNLOAD_PATH:-downloads}"
+DOWNLOAD_PATH="${DOWNLOAD_PATH:-downloads/youtube}"
 URL="$1"
 COUNT="${2:-10}"   # number of latest videos
 QUALITY="${3:-480p}"
