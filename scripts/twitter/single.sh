@@ -10,7 +10,7 @@ if [ -f "config/twitter.conf" ]; then
     source "config/twitter.conf"
 fi
 
-DOWNLOAD_PATH="${DOWNLOAD_PATH:-downloads/twitter}"
+DOWNLOAD_PATH="${DOWNLOAD_PATH:-downloads}"
 MAX_ZIP_SIZE_MB="${MAX_ZIP_SIZE_MB:-90}"
 SPLIT_LARGE_FILES="${SPLIT_LARGE_FILES:-true}"
 
