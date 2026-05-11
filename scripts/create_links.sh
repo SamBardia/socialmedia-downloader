@@ -2,6 +2,7 @@
 # ============================================
 # Create Links.md and Links.fa.md
 # Group by date, newest first, preserve history
+# Using RAW links for direct download
 # ============================================
 
 DOWNLOAD_BASE="downloads"
@@ -14,11 +15,11 @@ encode_path() {
     python3 -c "import urllib.parse, sys; print(urllib.parse.quote(sys.stdin.read().strip()))" <<< "$path"
 }
 
-get_blob_url() {
+get_raw_url() {
     local file_path="$1"
     file_path=$(printf "%s" "$file_path" | sed 's|^\./||' | tr -d '\n\r')
     local encoded_path=$(encode_path "$file_path")
-    echo "https://github.com/${GITHUB_REPOSITORY}/blob/main/${encoded_path}"
+    echo "https://github.com/${GITHUB_REPOSITORY}/raw/main/${encoded_path}"
 }
 
 format_size() {
@@ -84,11 +85,11 @@ while IFS= read -r file; do
     filename=$(basename "$file")
     size=$(stat -c%s "$file" 2>/dev/null || stat -f%z "$file" 2>/dev/null)
     size_fmt=$(format_size "$size")
-    blob_url=$(get_blob_url "$file")
+    raw_url=$(get_raw_url "$file")
     time_utc=$(format_time_utc "$timestamp")
     time_tehran=$(format_time_tehran "$timestamp")
     
-    echo "$timestamp|$time_utc|$time_tehran|$filename|$size_fmt|$blob_url" >> "$ALL_FILES"
+    echo "$timestamp|$time_utc|$time_tehran|$filename|$size_fmt|$raw_url" >> "$ALL_FILES"
 done < <(find "$DOWNLOAD_BASE" -type f ! -path "*/\.*" 2>/dev/null)
 
 # Update cache
@@ -104,7 +105,7 @@ NEW_CONTENT_EN=()
 NEW_CONTENT_FA=()
 current_date=""
 
-while IFS='|' read -r ts time_utc time_tehran filename size_fmt blob_url; do
+while IFS='|' read -r ts time_utc time_tehran filename size_fmt raw_url; do
     date_key=$(echo "$time_utc" | cut -d' ' -f1)
     
     if [ "$date_key" != "$current_date" ]; then
@@ -113,8 +114,8 @@ while IFS='|' read -r ts time_utc time_tehran filename size_fmt blob_url; do
         NEW_CONTENT_FA+=("### 📅 ${time_tehran}")
     fi
     
-    NEW_CONTENT_EN+=("- [${filename}](${blob_url}) (${size_fmt})")
-    NEW_CONTENT_FA+=("- [${filename}](${blob_url}) (${size_fmt})")
+    NEW_CONTENT_EN+=("- [${filename}](${raw_url}) (${size_fmt})")
+    NEW_CONTENT_FA+=("- [${filename}](${raw_url}) (${size_fmt})")
 done < "$TEMP_DIR/sorted_files.txt"
 
 # Read existing content (skip header lines)
@@ -167,4 +168,4 @@ fi
 
 rm -rf "$TEMP_DIR"
 
-echo "✅ Links created: $LINKS_FILE and $LINKS_FILE_FA"
+echo "✅ Links created: $LINKS_FILE and $LINKS_FILE_FA (RAW download links)"
