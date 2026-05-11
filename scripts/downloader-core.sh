@@ -21,7 +21,7 @@ mkdir -p "$DOWNLOAD_BASE/files"
 download_direct_file() {
     local file_url="$1"
     local filename=$(basename "$file_url" | cut -d'?' -f1)
-    local target_dir="$DOWNLOAD_BASE/files"
+    local target_dir="$DOWNLOAD_BASE"
     local target_file="$target_dir/$filename"
     local temp_dir="tmp_downloads"
     
