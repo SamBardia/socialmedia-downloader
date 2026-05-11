@@ -2,6 +2,7 @@
 # ============================================
 # Twitter thread downloader
 # Downloads all tweets in a thread (with or without media)
+# Fixed: Tweet text extraction for tweets without media
 # ============================================
 
 if [ -f "config/twitter.conf" ]; then
@@ -10,6 +11,18 @@ fi
 
 DOWNLOAD_PATH="${DOWNLOAD_PATH:-downloads/twitter}"
 URL="$1"
+
+# Function to extract tweet text properly
+extract_tweet_text() {
+    local title="$1"
+    # Remove "User on X: " or "User / X" patterns
+    local text=$(echo "$title" | sed -E 's/^[^:]+:[[:space:]]*//' | sed 's/ \/ X$//')
+    # If result is empty or just whitespace, try original
+    if [ -z "$(echo "$text" | tr -d '[:space:]')" ]; then
+        text="$title"
+    fi
+    echo "$text"
+}
 
 # Extract username from URL
 USERNAME=$(echo "$URL" | grep -oP 'x\.com/\K[^/]+')
@@ -70,13 +83,15 @@ while read -r tid; do
         HAS_MEDIA=true
     fi
     
-    # Extract tweet text
-    DESCRIPTION=$(echo "$METADATA" | jq -r '.description // empty')
-    if [ -z "$DESCRIPTION" ]; then
-        DESCRIPTION=$(echo "$METADATA" | jq -r '.title // empty')
-        DESCRIPTION=$(echo "$DESCRIPTION" | sed 's/^X 上的 //' | sed 's/ \/ X$//')
-    fi
-    if [ -z "$DESCRIPTION" ]; then
+    # Extract tweet text - FIXED
+    TITLE_TEXT=$(echo "$METADATA" | jq -r '.title // empty')
+    DESCRIPTION_TEXT=$(echo "$METADATA" | jq -r '.description // empty')
+    
+    if [ -n "$TITLE_TEXT" ] && [ "$TITLE_TEXT" != "null" ]; then
+        DESCRIPTION=$(extract_tweet_text "$TITLE_TEXT")
+    elif [ -n "$DESCRIPTION_TEXT" ] && [ "$DESCRIPTION_TEXT" != "null" ]; then
+        DESCRIPTION="$DESCRIPTION_TEXT"
+    else
         DESCRIPTION="[Text content not available]"
     fi
     
