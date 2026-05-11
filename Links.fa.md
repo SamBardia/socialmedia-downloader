@@ -8,17 +8,18 @@
 
 | # | وضعیت | نام فایل | پلتفرم | حجم | زمان انتشار (تهران) | لینک |
 |---|--------|----------|--------|------|----------------------|------|
-| 1 | ❌ | mpam-fe.zip | Direct Link | 21.2 MB | 2026-05-11 19:13:57 | فایل یافت نشد |
-| 2 | ❌ | mpam-fe.z02 | Direct Link | 90.0 MB | 2026-05-11 19:13:55 | فایل یافت نشد |
-| 3 | ❌ | mpam-fe.z01 | Direct Link | 90.0 MB | 2026-05-11 19:13:53 | فایل یافت نشد |
-| 4 | ❌ | chvrsi - Full Archive.zip | SoundCloud | 52.3 MB | 2026-05-11 19:13:19 | فایل یافت نشد |
-| 5 | ❌ | chvrsi - Full Archive.z04 | SoundCloud | 90.0 MB | 2026-05-11 19:13:19 | فایل یافت نشد |
-| 6 | ❌ | thefeed-client-v0.16.2-windows-amd64.exe | Direct Link | 3.2 MB | 2026-05-11 19:13:18 | فایل یافت نشد |
-| 7 | ❌ | mhrv-rs-windows-amd64.zip | Direct Link | 7.6 MB | 2026-05-11 19:13:18 | فایل یافت نشد |
-| 8 | ❌ | chvrsi - Full Archive.z03 | SoundCloud | 90.0 MB | 2026-05-11 19:13:18 | فایل یافت نشد |
-| 9 | ❌ | chvrsi - Full Archive.z02 | SoundCloud | 90.0 MB | 2026-05-11 19:13:18 | فایل یافت نشد |
-| 10 | ❌ | chvrsi - Full Archive.z01 | SoundCloud | 90.0 MB | 2026-05-11 19:13:18 | فایل یافت نشد |
-| 11 | ❌ | Putak - PutaK - Wow (ft. Poori).mp3 | SoundCloud | 2.8 MB | 2026-05-11 19:13:18 | فایل یافت نشد |
-| 12 | ❌ | Matin Fattahi, Ali Geramy - AROOM.mp3 | SoundCloud | 2.5 MB | 2026-05-11 19:13:18 | فایل یافت نشد |
+| 1 | ❌ | Firefox Setup 151.0b8.exe | Direct Link | 83.4 MB | 2026-05-11 19:20:43 | فایل یافت نشد |
+| 2 | ❌ | mpam-fe.zip | Direct Link | 21.2 MB | 2026-05-11 19:13:57 | فایل یافت نشد |
+| 3 | ❌ | mpam-fe.z02 | Direct Link | 90.0 MB | 2026-05-11 19:13:55 | فایل یافت نشد |
+| 4 | ❌ | mpam-fe.z01 | Direct Link | 90.0 MB | 2026-05-11 19:13:53 | فایل یافت نشد |
+| 5 | ❌ | chvrsi - Full Archive.zip | SoundCloud | 52.3 MB | 2026-05-11 19:13:19 | فایل یافت نشد |
+| 6 | ❌ | chvrsi - Full Archive.z04 | SoundCloud | 90.0 MB | 2026-05-11 19:13:19 | فایل یافت نشد |
+| 7 | ❌ | thefeed-client-v0.16.2-windows-amd64.exe | Direct Link | 3.2 MB | 2026-05-11 19:13:18 | فایل یافت نشد |
+| 8 | ❌ | mhrv-rs-windows-amd64.zip | Direct Link | 7.6 MB | 2026-05-11 19:13:18 | فایل یافت نشد |
+| 9 | ❌ | chvrsi - Full Archive.z03 | SoundCloud | 90.0 MB | 2026-05-11 19:13:18 | فایل یافت نشد |
+| 10 | ❌ | chvrsi - Full Archive.z02 | SoundCloud | 90.0 MB | 2026-05-11 19:13:18 | فایل یافت نشد |
+| 11 | ❌ | chvrsi - Full Archive.z01 | SoundCloud | 90.0 MB | 2026-05-11 19:13:18 | فایل یافت نشد |
+| 12 | ❌ | Putak - PutaK - Wow (ft. Poori).mp3 | SoundCloud | 2.8 MB | 2026-05-11 19:13:18 | فایل یافت نشد |
+| 13 | ❌ | Matin Fattahi, Ali Geramy - AROOM.mp3 | SoundCloud | 2.5 MB | 2026-05-11 19:13:18 | فایل یافت نشد |
 
 </div>

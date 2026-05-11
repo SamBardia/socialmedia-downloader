@@ -10,3 +10,4 @@ downloads/files/mpam-fe.zip|1778514237
 downloads/files/thefeed-client-v0.16.2-windows-amd64.exe|1778514198
 downloads/files/mpam-fe.z02|1778514235
 downloads/files/mpam-fe.z01|1778514233
+downloads/files/Firefox Setup 151.0b8.exe|1778514643
