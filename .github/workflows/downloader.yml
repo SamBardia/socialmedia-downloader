@@ -43,10 +43,10 @@ jobs:
           restore-keys: |
             links-cache-
 
-      - name: Install minimal dependencies
+      - name: Install dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y wget aria2
+          sudo apt-get install -y wget aria2 p7zip-full
           
           if [ "${{ steps.detect.outputs.has_platform }}" = "true" ]; then
             echo "Platform URLs detected, installing full dependencies..."
@@ -57,7 +57,6 @@ jobs:
           fi
 
       - name: Make scripts executable
-        if: steps.detect.outputs.has_platform == 'true'
         run: |
           chmod +x scripts/soundcloud/*.sh 2>/dev/null || true
           chmod +x scripts/twitter/*.sh 2>/dev/null || true
@@ -143,6 +142,7 @@ jobs:
             fi
 
             if [ -f "./scripts/create_links.sh" ]; then
+              chmod +x ./scripts/create_links.sh
               ./scripts/create_links.sh
             else
               echo "WARNING: create_links.sh not found, skipping links update."
@@ -160,6 +160,8 @@ jobs:
       - name: Final verification
         if: always()
         run: |
+          chmod +x scripts/create_links.sh 2>/dev/null || true
+          
           if [ -d "downloads" ]; then
             MAX_SIZE_MB=90
             find downloads -type f -size +${MAX_SIZE_MB}M -print0 | while IFS= read -r -d '' file; do
@@ -175,6 +177,7 @@ jobs:
           fi
           
           if [ -f "./scripts/create_links.sh" ]; then
+            chmod +x ./scripts/create_links.sh
             ./scripts/create_links.sh
           fi
 
