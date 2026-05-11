@@ -74,22 +74,20 @@ jobs:
               local dir=$(dirname "$file")
               local base=$(basename "$file")
               local name_no_ext="${base%.*}"
-              local temp_dir="$dir/split_temp_$$"
+              local output_file="$dir/${name_no_ext}_split.zip"
               
-              mkdir -p "$temp_dir"
-              cp "$file" "$temp_dir/"
-              
-              cd "$temp_dir"
-              zip -s "${max_mb}m" "${name_no_ext}.zip" "$base"
-              rm -f "$base"
-              mv "${name_no_ext}.zip"* "$dir/"
+              cd "$dir"
+              zip -s "${max_mb}m" --out "$output_file" "$base"
+              if [ $? -eq 0 ]; then
+                rm -f "$base"
+                mv "${name_no_ext}_split.zip"* "$dir/"
+                echo "Split complete. Parts:"
+                ls -la "$dir/${name_no_ext}_split.zip"* 2>/dev/null | awk '{print "  " $9 " (" $5 " bytes)"}'
+              else
+                echo "ERROR: Split failed for $file"
+                return 1
+              fi
               cd - > /dev/null
-              
-              rm -rf "$temp_dir"
-              rm -f "$file"
-              
-              echo "Split complete. Parts:"
-              ls -la "$dir/${name_no_ext}.zip"* 2>/dev/null | awk '{print "  " $9 " (" $5 " bytes)"}'
               return 0
             else
               echo "File size within limit, no split needed."
@@ -124,7 +122,7 @@ jobs:
 
             ./scripts/create_links.sh
             git config user.name "github-actions[bot]"
-            git config user.email "github-actions[bot]@users.noreply.github.com"
+            git config.user.email "github-actions[bot]@users.noreply.github.com"
             git add downloads/ Links.md Links.fa.md .links_cache.txt
             git diff --cached --quiet || git commit -m "Add downloaded content and update links [skip ci]"
             git pull --rebase --autostash origin main || true
@@ -141,23 +139,21 @@ jobs:
             dir=$(dirname "$file")
             base=$(basename "$file")
             name_no_ext="${base%.*}"
-            temp_dir="$dir/split_temp_$$"
-            mkdir -p "$temp_dir"
-            cp "$file" "$temp_dir/"
-            cd "$temp_dir"
-            zip -s "${MAX_SIZE_MB}m" "${name_no_ext}.zip" "$base"
-            rm -f "$base"
-            mv "${name_no_ext}.zip"* "$dir/"
+            output_file="$dir/${name_no_ext}_split.zip"
+            cd "$dir"
+            zip -s "${MAX_SIZE_MB}m" --out "$output_file" "$base"
+            if [ $? -eq 0 ]; then
+              rm -f "$base"
+              mv "${name_no_ext}_split.zip"* "$dir/"
+            fi
             cd - > /dev/null
-            rm -rf "$temp_dir"
-            rm -f "$file"
           done
           ./scripts/create_links.sh
 
       - name: Final push
         run: |
           git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git config.user.email "github-actions[bot]@users.noreply.github.com"
           git add downloads/ Links.md Links.fa.md .links_cache.txt
           git diff --cached --quiet || git commit -m "Final update after splitting [skip ci]"
           git pull --rebase --autostash origin main || true
