@@ -15,7 +15,7 @@ mkdir -p "$DOWNLOAD_BASE"
 mkdir -p "$DOWNLOAD_BASE/files"
 
 # ----------------------------------------------------------------------
-# Split a large file in-place (exactly like youtube/single.sh)
+# Split a large file using Linux 'split' command (works with any file type)
 # ----------------------------------------------------------------------
 split_large_file() {
     local file_path="$1"
@@ -29,15 +29,24 @@ split_large_file() {
         local base_name=$(basename "$file_path")
         local name_without_ext="${base_name%.*}"
         
-        echo "File size exceeds ${max_size_mb}MB, splitting into parts"
+        echo "File size exceeds ${max_size_mb}MB, splitting into parts with 'split' command"
         
         cd "$dir_path"
-        zip -s "${max_size_mb}m" "${name_without_ext}.zip" "$base_name"
+        split -b "${max_size_mb}M" "$base_name" "${name_without_ext}.part."
         rm -f "$base_name"
         cd - > /dev/null
         
+        # Create a merge script for user convenience
+        cat > "$dir_path/merge_${name_without_ext}.sh" << EOF
+#!/bin/bash
+# Merge split parts back to original file
+cat ${name_without_ext}.part.* > ${base_name}
+echo "Merged back to ${base_name}"
+EOF
+        chmod +x "$dir_path/merge_${name_without_ext}.sh"
+        
         echo "SUCCESS: File split into multiple parts in $dir_path"
-        ls -la "$dir_path/${name_without_ext}.zip"* 2>/dev/null
+        ls -la "$dir_path/${name_without_ext}.part."* 2>/dev/null
         return 0
     fi
     return 1
