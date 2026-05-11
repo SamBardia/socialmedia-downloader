@@ -4,7 +4,7 @@
 # Using raw links for direct download
 # ============================================
 
-DOWNLOAD_BASE="downloads"
+DOWNLOAD_BASE="dl"
 LINKS_FILE="Links.md"
 LINKS_FILE_FA="Links.fa.md"
 
