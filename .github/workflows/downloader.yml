@@ -56,19 +56,50 @@ jobs:
             touch youtube_cookies.txt
           fi
 
-      - name: Process URLs
+      - name: Process URLs with integrated splitting
         env:
           YOUTUBE_COOKIES: ${{ secrets.YOUTUBE_COOKIES }}
           INSTAGRAM_COOKIES: ${{ secrets.INSTAGRAM_COOKIES }}
           TWITTER_PROFILE_COUNT: ${{ github.event.inputs.twitter_profile_count }}
+          MAX_SIZE_MB: 90
         run: |
+          split_large_file() {
+            local file="$1"
+            local max_mb="$2"
+            local size=$(du -b "$file" | cut -f1)
+            local max_bytes=$((max_mb * 1024 * 1024))
+            if [ "$size" -gt "$max_bytes" ]; then
+              echo "Splitting large file: $file (size=$(numfmt --to=iec $size))"
+              local dir=$(dirname "$file")
+              local base=$(basename "$file")
+              local name_no_ext="${base%.*}"
+              local temp_dir="$dir/split_temp_$$"
+              mkdir -p "$temp_dir"
+              mv "$file" "$temp_dir/"
+              pushd "$temp_dir" > /dev/null
+              zip -s "${max_mb}m" "${name_no_ext}.zip" "$base"
+              rm -f "$base"
+              mv "${name_no_ext}.zip"* "$dir/"
+              popd > /dev/null
+              rm -rf "$temp_dir"
+              echo "Split complete. Parts:"
+              ls -la "$dir/${name_no_ext}.zip"* 2>/dev/null | awk '{print "  " $9 " (" $5 " bytes)"}'
+              return 0
+            else
+              echo "File size within limit, no split needed."
+              return 0
+            fi
+          }
+
           mkdir -p tmp_downloads
+
           IFS=$'\n'
           for URL in $(echo "${{ github.event.inputs.urls }}" | tr ',' '\n' | tr ' ' '\n' | sed 's/^[[:space:]]*//;s/[[:space:]]*$//'); do
             [ -z "$URL" ] && continue
             echo "========================================="
             echo "Processing: $URL"
             echo "========================================="
+
             if [[ "$URL" =~ (youtube\.com|youtu\.be|soundcloud\.com|on\.soundcloud\.com|x\.com|twitter\.com|instagram\.com|tiktok\.com) ]]; then
               echo "Platform URL -> using existing scripts"
               ./scripts/downloader-core.sh "$URL"
@@ -80,9 +111,18 @@ jobs:
                   FILENAME=$(basename "$FILE")
                   mkdir -p downloads/files
                   mv "$FILE" "downloads/files/$FILENAME"
+                  # Immediately split if large
+                  split_large_file "downloads/files/$FILENAME" "$MAX_SIZE_MB"
+                  # Remove the original if split succeeded
+                  if [ -f "downloads/files/${FILENAME%.*}.zip" ] || [ -f "downloads/files/${FILENAME%.*}.z01" ]; then
+                    rm -f "downloads/files/$FILENAME"
+                    echo "Removed original large file after splitting."
+                  fi
                 fi
               done
             fi
+
+            # Update links and push
             ./scripts/create_links.sh
             git config user.name "github-actions[bot]"
             git config user.email "github-actions[bot]@users.noreply.github.com"
@@ -93,11 +133,12 @@ jobs:
           done
           rm -rf tmp_downloads
 
-      - name: Split large files (safety)
+      - name: Final verification – split any leftover large files
+        if: always()
         run: |
           MAX_SIZE_MB=90
-          find downloads/files -type f -size +${MAX_SIZE_MB}M -print0 | while IFS= read -r -d '' file; do
-            echo "Splitting large file: $file"
+          find downloads -type f -size +${MAX_SIZE_MB}M -print0 | while IFS= read -r -d '' file; do
+            echo "Found leftover large file: $file – splitting now."
             dir=$(dirname "$file")
             base=$(basename "$file")
             name_no_ext="${base%.*}"
@@ -110,12 +151,11 @@ jobs:
             mv "${name_no_ext}.zip"* "$dir/"
             popd > /dev/null
             rm -rf "$temp_dir"
-            echo "Split complete for $file"
           done
-          # Update links after splitting
+          # Update links again
           ./scripts/create_links.sh
 
-      - name: Final push (in case of any remaining changes)
+      - name: Final push (after splitting)
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
@@ -136,5 +176,5 @@ jobs:
           echo "Download summary"
           echo "========================================="
           for dir in downloads/*/; do
-            [ -d "$dir" ] && echo "📁 $(basename "$dir"): $(ls -1 "$dir" | wc -l) items"
+            [ -d "$dir" ] && echo "$(basename "$dir"): $(ls -1 "$dir" | wc -l) items"
           done
