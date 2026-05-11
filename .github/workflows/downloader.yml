@@ -74,20 +74,22 @@ jobs:
               local dir=$(dirname "$file")
               local base=$(basename "$file")
               local name_no_ext="${base%.*}"
+              local temp_dir="$dir/split_temp_$$"
               
-              cd "$dir"
-              split -b "${max_mb}M" "$base" "${name_no_ext}.part."
+              mkdir -p "$temp_dir"
+              cp "$file" "$temp_dir/"
+              
+              cd "$temp_dir"
+              zip -s "${max_mb}m" "${name_no_ext}.zip" "$base"
               rm -f "$base"
+              mv "${name_no_ext}.zip"* "$dir/"
               cd - > /dev/null
               
+              rm -rf "$temp_dir"
+              rm -f "$file"
+              
               echo "Split complete. Parts:"
-              ls -la "$dir/${name_no_ext}.part."* 2>/dev/null | awk '{print "  " $9 " (" $5 " bytes)"}'
-              
-              echo '#!/bin/bash' > "$dir/merge_${name_no_ext}.sh"
-              echo "cat ${name_no_ext}.part.* > ${base}" >> "$dir/merge_${name_no_ext}.sh"
-              echo "echo \"Merged back to ${base}\"" >> "$dir/merge_${name_no_ext}.sh"
-              chmod +x "$dir/merge_${name_no_ext}.sh"
-              
+              ls -la "$dir/${name_no_ext}.zip"* 2>/dev/null | awk '{print "  " $9 " (" $5 " bytes)"}'
               return 0
             else
               echo "File size within limit, no split needed."
@@ -139,14 +141,16 @@ jobs:
             dir=$(dirname "$file")
             base=$(basename "$file")
             name_no_ext="${base%.*}"
-            cd "$dir"
-            split -b "${MAX_SIZE_MB}M" "$base" "${name_no_ext}.part."
+            temp_dir="$dir/split_temp_$$"
+            mkdir -p "$temp_dir"
+            cp "$file" "$temp_dir/"
+            cd "$temp_dir"
+            zip -s "${MAX_SIZE_MB}m" "${name_no_ext}.zip" "$base"
             rm -f "$base"
+            mv "${name_no_ext}.zip"* "$dir/"
             cd - > /dev/null
-            echo '#!/bin/bash' > "$dir/merge_${name_no_ext}.sh"
-            echo "cat ${name_no_ext}.part.* > ${base}" >> "$dir/merge_${name_no_ext}.sh"
-            echo "echo \"Merged back to ${base}\"" >> "$dir/merge_${name_no_ext}.sh"
-            chmod +x "$dir/merge_${name_no_ext}.sh"
+            rm -rf "$temp_dir"
+            rm -f "$file"
           done
           ./scripts/create_links.sh
 
