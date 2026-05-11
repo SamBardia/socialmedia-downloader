@@ -2,6 +2,7 @@
 # ============================================
 # Twitter profile last N tweets downloader
 # Downloads all tweets (with or without media) from a profile
+# Fixed: COUNT validation + tweet text extraction
 # ============================================
 
 if [ -f "config/twitter.conf" ]; then
@@ -12,8 +13,18 @@ DOWNLOAD_PATH="${DOWNLOAD_PATH:-downloads/twitter}"
 URL="$1"
 COUNT="${2:-20}"
 
+# ============================================
+# Validate COUNT is a number
+# ============================================
+if ! [[ "$COUNT" =~ ^[0-9]+$ ]]; then
+    echo "WARNING: COUNT '$COUNT' is not a number, using default 20"
+    COUNT=20
+fi
+
 # Limit to 50 tweets maximum
-[ "$COUNT" -gt 50 ] && COUNT=50
+if [ "$COUNT" -gt 50 ]; then
+    COUNT=50
+fi
 
 # Extract username from URL
 USERNAME=$(echo "$URL" | sed -n 's|https://x\.com/\([^/]*\).*|\1|p')
@@ -49,6 +60,18 @@ python3 -m yt_dlp --flat-playlist --playlist-end "$COUNT" --dump-json "https://x
 TOTAL_TWEETS=$(wc -l < tweet_urls.txt)
 echo "Found $TOTAL_TWEETS tweets"
 
+# Function to extract tweet text properly
+extract_tweet_text() {
+    local title="$1"
+    # Remove "User on X: " or "User / X" patterns
+    local text=$(echo "$title" | sed -E 's/^[^:]+:[[:space:]]*//' | sed 's/ \/ X$//')
+    # If result is empty or just whitespace, try description
+    if [ -z "$(echo "$text" | tr -d '[:space:]')" ]; then
+        text="$1"
+    fi
+    echo "$text"
+}
+
 INDEX=1
 while read -r tweet_url; do
     [ -z "$tweet_url" ] && continue
@@ -71,13 +94,15 @@ while read -r tweet_url; do
         HAS_MEDIA=true
     fi
     
-    # Extract tweet text
-    DESCRIPTION=$(echo "$METADATA" | jq -r '.description // empty')
-    if [ -z "$DESCRIPTION" ]; then
-        DESCRIPTION=$(echo "$METADATA" | jq -r '.title // empty')
-        DESCRIPTION=$(echo "$DESCRIPTION" | sed 's/^X 上的 //' | sed 's/ \/ X$//')
-    fi
-    if [ -z "$DESCRIPTION" ]; then
+    # Extract tweet text - FIXED
+    TITLE_TEXT=$(echo "$METADATA" | jq -r '.title // empty')
+    DESCRIPTION_TEXT=$(echo "$METADATA" | jq -r '.description // empty')
+    
+    if [ -n "$TITLE_TEXT" ] && [ "$TITLE_TEXT" != "null" ]; then
+        DESCRIPTION=$(extract_tweet_text "$TITLE_TEXT")
+    elif [ -n "$DESCRIPTION_TEXT" ] && [ "$DESCRIPTION_TEXT" != "null" ]; then
+        DESCRIPTION="$DESCRIPTION_TEXT"
+    else
         DESCRIPTION="[Text content not available]"
     fi
     
