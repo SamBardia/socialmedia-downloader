@@ -1,7 +1,7 @@
 #!/bin/bash
 # ============================================
 # Create Links.md (English & Persian)
-# With file existence check and fixed timestamps
+# With persistent file timestamp cache using GitHub Actions cache
 # ============================================
 
 DOWNLOAD_BASE="downloads"
@@ -83,16 +83,18 @@ SORTED_DATA="$TEMP_DIR/sorted_data.txt"
 NEW_CACHE="$TEMP_DIR/new_cache.txt"
 
 while IFS= read -r file; do
-    if [[ "$file" == "$LINKS_FILE" ]] || [[ "$file" == "$LINKS_FILE_FA" ]]; then
+    if [[ "$file" == "$LINKS_FILE" ]] || [[ "$file" == "$LINKS_FILE_FA" ]] || [[ "$file" == "$CACHE_FILE" ]]; then
         continue
     fi
     
     # Get file timestamp (creation or modification)
     current_time=$(get_file_time "$file")
     
-    # Use cached timestamp if available and file hasn't been modified
+    # Use cached timestamp if available, otherwise use current and add to new cache
     if [ -n "${file_cache[$file]}" ]; then
         timestamp="${file_cache[$file]}"
+        # Still keep this file in new cache (preserve old timestamp)
+        echo "$file|$timestamp" >> "$NEW_CACHE"
     else
         timestamp="$current_time"
         echo "$file|$timestamp" >> "$NEW_CACHE"
@@ -111,8 +113,8 @@ while IFS= read -r file; do
 done < <(find "$DOWNLOAD_BASE" -type f ! -path "*/\.*" 2>/dev/null)
 
 # Update cache file with current files
-if [ -f "$NEW_CACHE" ]; then
-    cat "$NEW_CACHE" > "$CACHE_FILE"
+if [ -s "$NEW_CACHE" ]; then
+    mv "$NEW_CACHE" "$CACHE_FILE"
 fi
 
 # Sort by timestamp (newest first)
@@ -151,7 +153,7 @@ if [ -f "$SORTED_DATA" ]; then
         
         # Check if file still exists
         file_exists=false
-        if [ -f "$DOWNLOAD_BASE/${filename}" ] || find "$DOWNLOAD_BASE" -name "$filename" -print -quit | grep -q .; then
+        if [ -f "$file" ] 2>/dev/null; then
             file_exists=true
         fi
         
