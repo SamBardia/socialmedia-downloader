@@ -17,7 +17,43 @@ URL="$1"
 mkdir -p "$DOWNLOAD_BASE"
 mkdir -p "$DOWNLOAD_BASE/files"
 
-# Function to download a direct file URL using aria2 (like sandbox)
+# ============================================
+# Function to split a large file into ZIP parts
+# ============================================
+split_large_file() {
+    local file_path="$1"
+    local max_size_mb="$2"
+    
+    local file_size=$(stat -c%s "$file_path" 2>/dev/null || stat -f%z "$file_path" 2>/dev/null)
+    local max_size_bytes=$((max_size_mb * 1024 * 1024))
+    
+    if [ "$file_size" -gt "$max_size_bytes" ]; then
+        echo "⚠️ File size ($(echo "scale=1; $file_size / 1048576" | bc) MB) exceeds ${max_size_mb}MB, splitting into parts"
+        
+        local dir_path=$(dirname "$file_path")
+        local base_name=$(basename "$file_path")
+        local name_without_ext="${base_name%.*}"
+        local temp_dir="$dir_path/temp_split_$$"
+        
+        mkdir -p "$temp_dir"
+        mv "$file_path" "$temp_dir/"
+        
+        cd "$temp_dir"
+        zip -s "${max_size_mb}m" "${name_without_ext}.zip" "$base_name"
+        rm -f "$base_name"
+        mv "${name_without_ext}.zip"* "$dir_path/"
+        cd - > /dev/null
+        
+        rm -rf "$temp_dir"
+        echo "✅ SUCCESS: File split into multiple parts (${name_without_ext}.zip, ${name_without_ext}.z01, ...)"
+        return 0
+    fi
+    return 1
+}
+
+# ============================================
+# Function to download a direct file URL using aria2
+# ============================================
 download_direct_file() {
     local file_url="$1"
     local filename=$(basename "$file_url" | cut -d'?' -f1)
@@ -27,12 +63,12 @@ download_direct_file() {
     
     mkdir -p "$temp_dir"
     
-    echo "Downloading direct file: $filename"
+    echo "📥 Downloading direct file: $filename"
     aria2c --split=2 --max-connection-per-server=2 --dir="$temp_dir" "$file_url"
     
     # Check if download was successful
     if [ ! -f "$temp_dir/$filename" ]; then
-        echo "ERROR: Failed to download $filename"
+        echo "❌ ERROR: Failed to download $filename"
         rm -rf "$temp_dir"
         return 1
     fi
@@ -41,30 +77,18 @@ download_direct_file() {
     mv "$temp_dir/$filename" "$target_file"
     rm -rf "$temp_dir"
     
-    # Get file size
-    local file_size=$(stat -c%s "$target_file" 2>/dev/null || stat -f%z "$target_file" 2>/dev/null)
-    local max_size_bytes=$((MAX_ZIP_SIZE_MB * 1024 * 1024))
-    
-    # If file is large, split it
-    if [ "$SPLIT_LARGE_FILES" = "true" ] && [ "$file_size" -gt "$max_size_bytes" ]; then
-        echo "File exceeds ${MAX_ZIP_SIZE_MB}MB, splitting into parts"
-        local base_name="${filename%.*}"
-        local temp_split_dir="$target_dir/temp_split_$$"
-        mkdir -p "$temp_split_dir"
-        mv "$target_file" "$temp_split_dir/"
-        cd "$temp_split_dir"
-        zip -s "${MAX_ZIP_SIZE_MB}m" "${base_name}.zip" "$filename"
-        rm -f "$filename"
-        mv "${base_name}.zip"* "$target_dir/"
-        cd - > /dev/null
-        rm -rf "$temp_split_dir"
+    # Split large file if needed
+    if [ "$SPLIT_LARGE_FILES" = "true" ]; then
+        split_large_file "$target_file" "$MAX_ZIP_SIZE_MB"
     fi
     
-    echo "SUCCESS: Saved to $target_file"
+    echo "✅ SUCCESS: Saved to $target_file"
     return 0
 }
 
+# ============================================
 # Function to detect platform
+# ============================================
 detect_platform() {
     local url="$1"
     if [[ "$url" == *"soundcloud.com"* ]] || [[ "$url" == *"on.soundcloud.com"* ]] || [[ "$url" == *"snd.sc"* ]]; then
@@ -84,7 +108,9 @@ detect_platform() {
     fi
 }
 
-# Process the URL
+# ============================================
+# Main processing
+# ============================================
 echo "========================================="
 echo "Processing: $URL"
 PLATFORM=$(detect_platform "$URL")
@@ -120,6 +146,6 @@ case "$PLATFORM" in
         ./scripts/tiktok/single.sh "$URL"
         ;;
     *)
-        echo "WARNING: Unsupported platform for $URL"
+        echo "❌ WARNING: Unsupported platform for $URL"
         ;;
 esac
