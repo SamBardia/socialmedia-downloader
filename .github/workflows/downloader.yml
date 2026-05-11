@@ -62,26 +62,19 @@ jobs:
           INSTAGRAM_COOKIES: ${{ secrets.INSTAGRAM_COOKIES }}
           TWITTER_PROFILE_COUNT: ${{ github.event.inputs.twitter_profile_count }}
         run: |
-          # Create temporary download directory
           mkdir -p tmp_downloads
-          
-          # Process each URL one by one
           IFS=$'\n'
           for URL in $(echo "${{ github.event.inputs.urls }}" | tr ',' '\n' | tr ' ' '\n' | sed 's/^[[:space:]]*//;s/[[:space:]]*$//'); do
             [ -z "$URL" ] && continue
             echo "========================================="
             echo "Processing: $URL"
             echo "========================================="
-            
-            # Detect if it's a platform URL or direct file
             if [[ "$URL" =~ (youtube\.com|youtu\.be|soundcloud\.com|on\.soundcloud\.com|x\.com|twitter\.com|instagram\.com|tiktok\.com) ]]; then
-              echo "Platform URL → using existing scripts"
+              echo "Platform URL -> using existing scripts"
               ./scripts/downloader-core.sh "$URL"
             else
-              echo "Direct file → using aria2"
+              echo "Direct file -> using aria2"
               aria2c --split=2 --max-connection-per-server=2 --dir="tmp_downloads" "$URL"
-              
-              # Move to appropriate folder based on file extension
               for FILE in tmp_downloads/*; do
                 if [ -f "$FILE" ]; then
                   FILENAME=$(basename "$FILE")
@@ -90,11 +83,7 @@ jobs:
                 fi
               done
             fi
-            
-            # After each download, update links
             ./scripts/create_links.sh
-            
-            # Push after each download to avoid large batches
             git config user.name "github-actions[bot]"
             git config user.email "github-actions[bot]@users.noreply.github.com"
             git add downloads/ Links.md Links.fa.md .links_cache.txt
@@ -102,15 +91,36 @@ jobs:
             git pull --rebase --autostash origin main || true
             git push
           done
-          
           rm -rf tmp_downloads
+
+      - name: Split large files (safety)
+        run: |
+          MAX_SIZE_MB=90
+          find downloads/files -type f -size +${MAX_SIZE_MB}M -print0 | while IFS= read -r -d '' file; do
+            echo "Splitting large file: $file"
+            dir=$(dirname "$file")
+            base=$(basename "$file")
+            name_no_ext="${base%.*}"
+            temp_dir="$dir/split_temp_$$"
+            mkdir -p "$temp_dir"
+            mv "$file" "$temp_dir/"
+            pushd "$temp_dir" > /dev/null
+            zip -s "${MAX_SIZE_MB}m" "${name_no_ext}.zip" "$base"
+            rm -f "$base"
+            mv "${name_no_ext}.zip"* "$dir/"
+            popd > /dev/null
+            rm -rf "$temp_dir"
+            echo "Split complete for $file"
+          done
+          # Update links after splitting
+          ./scripts/create_links.sh
 
       - name: Final push (in case of any remaining changes)
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add downloads/ Links.md Links.fa.md .links_cache.txt
-          git diff --cached --quiet || git commit -m "Final update of downloaded content [skip ci]"
+          git diff --cached --quiet || git commit -m "Final update after splitting [skip ci]"
           git pull --rebase --autostash origin main || true
           git push
 
