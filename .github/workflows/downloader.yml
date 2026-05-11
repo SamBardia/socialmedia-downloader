@@ -56,14 +56,13 @@ jobs:
             touch youtube_cookies.txt
           fi
 
-      - name: Process URLs with integrated splitting
+      - name: Process URLs
         env:
           YOUTUBE_COOKIES: ${{ secrets.YOUTUBE_COOKIES }}
           INSTAGRAM_COOKIES: ${{ secrets.INSTAGRAM_COOKIES }}
           TWITTER_PROFILE_COUNT: ${{ github.event.inputs.twitter_profile_count }}
           MAX_SIZE_MB: 90
         run: |
-          # Split function using Linux 'split' command (works with any file type)
           split_large_file() {
             local file="$1"
             local max_mb="$2"
@@ -77,21 +76,16 @@ jobs:
               local name_no_ext="${base%.*}"
               
               cd "$dir"
-              # Use split command - creates files like: name.part.aa, name.part.ab, etc.
               split -b "${max_mb}M" "$base" "${name_no_ext}.part."
               rm -f "$base"
               cd - > /dev/null
               
-              echo "Split complete. Parts created:"
+              echo "Split complete. Parts:"
               ls -la "$dir/${name_no_ext}.part."* 2>/dev/null | awk '{print "  " $9 " (" $5 " bytes)"}'
               
-              # Create a merge script for user convenience
-              cat > "$dir/merge_${name_no_ext}.sh" << 'EOF'
-#!/bin/bash
-# Merge split parts back to original file
-cat ${name_no_ext}.part.* > ${base}
-echo "Merged back to ${base}"
-EOF
+              echo '#!/bin/bash' > "$dir/merge_${name_no_ext}.sh"
+              echo "cat ${name_no_ext}.part.* > ${base}" >> "$dir/merge_${name_no_ext}.sh"
+              echo "echo \"Merged back to ${base}\"" >> "$dir/merge_${name_no_ext}.sh"
               chmod +x "$dir/merge_${name_no_ext}.sh"
               
               return 0
@@ -136,7 +130,7 @@ EOF
           done
           rm -rf tmp_downloads
 
-      - name: Final verification - split any leftover large files
+      - name: Final verification
         if: always()
         run: |
           MAX_SIZE_MB=90
@@ -149,17 +143,14 @@ EOF
             split -b "${MAX_SIZE_MB}M" "$base" "${name_no_ext}.part."
             rm -f "$base"
             cd - > /dev/null
-            # Create merge script
-            cat > "$dir/merge_${name_no_ext}.sh" << EOF
-#!/bin/bash
-cat ${name_no_ext}.part.* > ${base}
-echo "Merged back to ${base}"
-EOF
+            echo '#!/bin/bash' > "$dir/merge_${name_no_ext}.sh"
+            echo "cat ${name_no_ext}.part.* > ${base}" >> "$dir/merge_${name_no_ext}.sh"
+            echo "echo \"Merged back to ${base}\"" >> "$dir/merge_${name_no_ext}.sh"
             chmod +x "$dir/merge_${name_no_ext}.sh"
           done
           ./scripts/create_links.sh
 
-      - name: Final push after splitting
+      - name: Final push
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
