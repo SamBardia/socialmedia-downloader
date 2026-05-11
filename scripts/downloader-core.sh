@@ -1,7 +1,5 @@
 #!/bin/bash
-# ============================================
-# Core Downloader - Handles both direct files and platform links
-# ============================================
+# Core Downloader - Handles direct files and platform links
 
 if [ -f "config/common.conf" ]; then
     source "config/common.conf"
@@ -16,9 +14,9 @@ URL="$1"
 mkdir -p "$DOWNLOAD_BASE"
 mkdir -p "$DOWNLOAD_BASE/files"
 
-# ------------------------------------------------------------
+# ----------------------------------------------------------------------
 # Split a large file into ZIP parts (max_size_mb per part)
-# ------------------------------------------------------------
+# ----------------------------------------------------------------------
 split_large_file() {
     local file_path="$1"
     local max_size_mb="$2"
@@ -26,7 +24,7 @@ split_large_file() {
     local max_size_bytes=$((max_size_mb * 1024 * 1024))
 
     if [ "$file_size" -gt "$max_size_bytes" ]; then
-        echo "File size ($(echo "scale=2; $file_size / 1048576" | bc) MB) exceeds ${max_size_mb} MB, splitting..."
+        echo "File size ($(numfmt --to=iec $file_size)) exceeds ${max_size_mb} MB, splitting..."
         local dir_path=$(dirname "$file_path")
         local base_name=$(basename "$file_path")
         local name_without_ext="${base_name%.*}"
@@ -53,14 +51,14 @@ split_large_file() {
             return 1
         fi
     else
-        echo "File size within limit, no splitting needed"
+        echo "File size within limit, no splitting needed."
         return 0
     fi
 }
 
-# ------------------------------------------------------------
+# ----------------------------------------------------------------------
 # Download a direct file URL using aria2
-# ------------------------------------------------------------
+# ----------------------------------------------------------------------
 download_direct_file() {
     local file_url="$1"
     local filename=$(basename "$file_url" | cut -d'?' -f1)
@@ -81,6 +79,7 @@ download_direct_file() {
     mv "$temp_dir/$filename" "$target_file"
     rm -rf "$temp_dir"
 
+    # Split large files if configured
     if [ "$SPLIT_LARGE_FILES" = "true" ]; then
         split_large_file "$target_file" "$MAX_ZIP_SIZE_MB"
         local split_rc=$?
@@ -88,7 +87,7 @@ download_direct_file() {
             local base_name=$(basename "$target_file")
             local name_without_ext="${base_name%.*}"
             if [ -f "${target_dir}/${name_without_ext}.zip" ] || [ -f "${target_dir}/${name_without_ext}.z01" ]; then
-                echo "Removing original large file: $target_file"
+                echo "Removing original large file after splitting."
                 rm -f "$target_file"
             fi
         fi
@@ -98,9 +97,9 @@ download_direct_file() {
     return 0
 }
 
-# ------------------------------------------------------------
+# ----------------------------------------------------------------------
 # Detect platform from URL
-# ------------------------------------------------------------
+# ----------------------------------------------------------------------
 detect_platform() {
     local url="$1"
     if [[ "$url" == *"soundcloud.com"* ]] || [[ "$url" == *"on.soundcloud.com"* ]] || [[ "$url" == *"snd.sc"* ]]; then
@@ -120,9 +119,9 @@ detect_platform() {
     fi
 }
 
-# ------------------------------------------------------------
+# ----------------------------------------------------------------------
 # Main
-# ------------------------------------------------------------
+# ----------------------------------------------------------------------
 echo "========================================="
 echo "Processing: $URL"
 PLATFORM=$(detect_platform "$URL")
