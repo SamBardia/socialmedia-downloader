@@ -95,7 +95,7 @@ if [ -z "$TARGET_DIR" ]; then
     MAX_SIZE_BYTES=$((MAX_ZIP_SIZE_MB * 1024 * 1024))
     
     if [ "$SPLIT_LARGE_FILES" = "true" ] && [ "$TOTAL_SIZE" -gt "$MAX_SIZE_BYTES" ]; then
-        zip -s "${MAX_ZIP_SIZE_MB}m} -r "$FINAL_ZIP_NAME" "$TEMP_DIR"
+        zip -s "${MAX_ZIP_SIZE_MB}m" -r "$FINAL_ZIP_NAME" "$TEMP_DIR"
     else
         zip -r "$FINAL_ZIP_NAME" "$TEMP_DIR"
     fi
