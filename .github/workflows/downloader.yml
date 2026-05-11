@@ -63,7 +63,7 @@ jobs:
           TWITTER_PROFILE_COUNT: ${{ github.event.inputs.twitter_profile_count }}
           MAX_SIZE_MB: 90
         run: |
-          # Simple split function - NO pushd/popd, NO mv after zip
+          # Split function using Linux 'split' command (works with any file type)
           split_large_file() {
             local file="$1"
             local max_mb="$2"
@@ -76,14 +76,24 @@ jobs:
               local base=$(basename "$file")
               local name_no_ext="${base%.*}"
               
-              # Go to the directory and split in-place (like youtube/single.sh)
               cd "$dir"
-              zip -s "${max_mb}m" "${name_no_ext}.zip" "$base"
+              # Use split command - creates files like: name.part.aa, name.part.ab, etc.
+              split -b "${max_mb}M" "$base" "${name_no_ext}.part."
               rm -f "$base"
               cd - > /dev/null
               
-              echo "Split complete. Parts:"
-              ls -la "$dir/${name_no_ext}.zip"* 2>/dev/null | awk '{print "  " $9 " (" $5 " bytes)"}'
+              echo "Split complete. Parts created:"
+              ls -la "$dir/${name_no_ext}.part."* 2>/dev/null | awk '{print "  " $9 " (" $5 " bytes)"}'
+              
+              # Create a merge script for user convenience
+              cat > "$dir/merge_${name_no_ext}.sh" << 'EOF'
+#!/bin/bash
+# Merge split parts back to original file
+cat ${name_no_ext}.part.* > ${base}
+echo "Merged back to ${base}"
+EOF
+              chmod +x "$dir/merge_${name_no_ext}.sh"
+              
               return 0
             else
               echo "File size within limit, no split needed."
@@ -136,9 +146,16 @@ jobs:
             base=$(basename "$file")
             name_no_ext="${base%.*}"
             cd "$dir"
-            zip -s "${MAX_SIZE_MB}m" "${name_no_ext}.zip" "$base"
+            split -b "${MAX_SIZE_MB}M" "$base" "${name_no_ext}.part."
             rm -f "$base"
             cd - > /dev/null
+            # Create merge script
+            cat > "$dir/merge_${name_no_ext}.sh" << EOF
+#!/bin/bash
+cat ${name_no_ext}.part.* > ${base}
+echo "Merged back to ${base}"
+EOF
+            chmod +x "$dir/merge_${name_no_ext}.sh"
           done
           ./scripts/create_links.sh
 
