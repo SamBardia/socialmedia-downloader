@@ -22,6 +22,19 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
+      - name: Detect URL types
+        id: detect
+        run: |
+          URLS="${{ github.event.inputs.urls }}"
+          HAS_PLATFORM=false
+          
+          if [[ "$URLS" =~ (youtube\.com|youtu\.be|soundcloud\.com|on\.soundcloud\.com|x\.com|twitter\.com|instagram\.com|tiktok\.com) ]]; then
+            HAS_PLATFORM=true
+          fi
+          
+          echo "has_platform=$HAS_PLATFORM" >> $GITHUB_OUTPUT
+          echo "Detected platform URLs: $HAS_PLATFORM"
+
       - name: Restore timestamp cache
         uses: actions/cache/restore@v4
         with:
@@ -30,13 +43,21 @@ jobs:
           restore-keys: |
             links-cache-
 
-      - name: Install dependencies
+      - name: Install minimal dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y ffmpeg zip jq bc wget aria2
-          pip install yt-dlp
+          sudo apt-get install -y wget aria2
+          
+          if [ "${{ steps.detect.outputs.has_platform }}" = "true" ]; then
+            echo "Platform URLs detected, installing full dependencies..."
+            sudo apt-get install -y ffmpeg zip jq bc
+            pip install yt-dlp
+          else
+            echo "Only direct links detected, skipping heavy dependencies."
+          fi
 
       - name: Make scripts executable
+        if: steps.detect.outputs.has_platform == 'true'
         run: |
           chmod +x scripts/soundcloud/*.sh 2>/dev/null || true
           chmod +x scripts/twitter/*.sh 2>/dev/null || true
@@ -47,6 +68,7 @@ jobs:
           chmod +x scripts/create_links.sh 2>/dev/null || true
 
       - name: Setup YouTube Cookies (if exists)
+        if: steps.detect.outputs.has_platform == 'true'
         env:
           YOUTUBE_COOKIES: ${{ secrets.YOUTUBE_COOKIES }}
         run: |
@@ -62,6 +84,7 @@ jobs:
           INSTAGRAM_COOKIES: ${{ secrets.INSTAGRAM_COOKIES }}
           TWITTER_PROFILE_COUNT: ${{ github.event.inputs.twitter_profile_count }}
           MAX_SIZE_MB: 90
+          HAS_PLATFORM: ${{ steps.detect.outputs.has_platform }}
         run: |
           split_large_file() {
             local file="$1"
@@ -74,20 +97,14 @@ jobs:
               local dir=$(dirname "$file")
               local base=$(basename "$file")
               local name_no_ext="${base%.*}"
-              local output_file="$dir/${name_no_ext}_split.zip"
               
               cd "$dir"
-              zip -s "${max_mb}m" --out "$output_file" "$base"
-              if [ $? -eq 0 ]; then
-                rm -f "$base"
-                mv "${name_no_ext}_split.zip"* "$dir/"
-                echo "Split complete. Parts:"
-                ls -la "$dir/${name_no_ext}_split.zip"* 2>/dev/null | awk '{print "  " $9 " (" $5 " bytes)"}'
-              else
-                echo "ERROR: Split failed for $file"
-                return 1
-              fi
+              7z a -v"${max_mb}m" -mx0 "${name_no_ext}.7z" "$base"
+              rm -f "$base"
               cd - > /dev/null
+              
+              echo "Split complete. Parts:"
+              ls -la "$dir/${name_no_ext}.7z."* 2>/dev/null | awk '{print "  " $9 " (" $5 " bytes)"}'
               return 0
             else
               echo "File size within limit, no split needed."
@@ -105,8 +122,13 @@ jobs:
             echo "========================================="
 
             if [[ "$URL" =~ (youtube\.com|youtu\.be|soundcloud\.com|on\.soundcloud\.com|x\.com|twitter\.com|instagram\.com|tiktok\.com) ]]; then
-              echo "Platform URL -> using existing scripts"
-              ./scripts/downloader-core.sh "$URL"
+              if [ "$HAS_PLATFORM" = "true" ]; then
+                echo "Platform URL -> using existing scripts"
+                ./scripts/downloader-core.sh "$URL"
+              else
+                echo "ERROR: Platform URL detected but dependencies not installed."
+                exit 1
+              fi
             else
               echo "Direct file -> using aria2"
               aria2c --split=2 --max-connection-per-server=2 --dir="tmp_downloads" "$URL"
@@ -120,10 +142,15 @@ jobs:
               done
             fi
 
-            ./scripts/create_links.sh
+            if [ -f "./scripts/create_links.sh" ]; then
+              ./scripts/create_links.sh
+            else
+              echo "WARNING: create_links.sh not found, skipping links update."
+            fi
+            
             git config user.name "github-actions[bot]"
-            git config.user.email "github-actions[bot]@users.noreply.github.com"
-            git add downloads/ Links.md Links.fa.md .links_cache.txt
+            git config user.email "github-actions[bot]@users.noreply.github.com"
+            git add downloads/ Links.md Links.fa.md .links_cache.txt 2>/dev/null || true
             git diff --cached --quiet || git commit -m "Add downloaded content and update links [skip ci]"
             git pull --rebase --autostash origin main || true
             git push
@@ -133,28 +160,29 @@ jobs:
       - name: Final verification
         if: always()
         run: |
-          MAX_SIZE_MB=90
-          find downloads -type f -size +${MAX_SIZE_MB}M -print0 | while IFS= read -r -d '' file; do
-            echo "Found leftover large file: $file - splitting now."
-            dir=$(dirname "$file")
-            base=$(basename "$file")
-            name_no_ext="${base%.*}"
-            output_file="$dir/${name_no_ext}_split.zip"
-            cd "$dir"
-            zip -s "${MAX_SIZE_MB}m" --out "$output_file" "$base"
-            if [ $? -eq 0 ]; then
+          if [ -d "downloads" ]; then
+            MAX_SIZE_MB=90
+            find downloads -type f -size +${MAX_SIZE_MB}M -print0 | while IFS= read -r -d '' file; do
+              echo "Found leftover large file: $file - splitting now."
+              dir=$(dirname "$file")
+              base=$(basename "$file")
+              name_no_ext="${base%.*}"
+              cd "$dir"
+              7z a -v"${MAX_SIZE_MB}m" -mx0 "${name_no_ext}.7z" "$base"
               rm -f "$base"
-              mv "${name_no_ext}_split.zip"* "$dir/"
-            fi
-            cd - > /dev/null
-          done
-          ./scripts/create_links.sh
+              cd - > /dev/null
+            done
+          fi
+          
+          if [ -f "./scripts/create_links.sh" ]; then
+            ./scripts/create_links.sh
+          fi
 
       - name: Final push
         run: |
           git config user.name "github-actions[bot]"
-          git config.user.email "github-actions[bot]@users.noreply.github.com"
-          git add downloads/ Links.md Links.fa.md .links_cache.txt
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add downloads/ Links.md Links.fa.md .links_cache.txt 2>/dev/null || true
           git diff --cached --quiet || git commit -m "Final update after splitting [skip ci]"
           git pull --rebase --autostash origin main || true
           git push
@@ -170,6 +198,10 @@ jobs:
           echo "========================================="
           echo "Download summary"
           echo "========================================="
-          for dir in downloads/*/; do
-            [ -d "$dir" ] && echo "$(basename "$dir"): $(ls -1 "$dir" | wc -l) items"
-          done
+          if [ -d "downloads" ]; then
+            for dir in downloads/*/; do
+              [ -d "$dir" ] && echo "$(basename "$dir"): $(ls -1 "$dir" | wc -l) items"
+            done
+          else
+            echo "No downloads folder found."
+          fi
