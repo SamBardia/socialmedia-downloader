@@ -18,17 +18,21 @@ mkdir -p "$DOWNLOAD_BASE"
 mkdir -p "$DOWNLOAD_BASE/files"
 
 # ============================================
-# Function to split a large file into ZIP parts
+# Function to split a large file into ZIP parts (RELIABLE VERSION)
 # ============================================
 split_large_file() {
     local file_path="$1"
     local max_size_mb="$2"
     
-    local file_size=$(stat -c%s "$file_path" 2>/dev/null || stat -f%z "$file_path" 2>/dev/null)
+    # Use du to get file size in bytes (more reliable than stat across systems)
+    local file_size=$(du -b "$file_path" | cut -f1)
     local max_size_bytes=$((max_size_mb * 1024 * 1024))
     
+    echo "DEBUG: File size = $file_size bytes, Max allowed = $max_size_bytes bytes"
+    
     if [ "$file_size" -gt "$max_size_bytes" ]; then
-        echo "⚠️ File size ($(echo "scale=1; $file_size / 1048576" | bc) MB) exceeds ${max_size_mb}MB, splitting into parts"
+        local file_size_mb=$(echo "scale=2; $file_size / 1048576" | bc)
+        echo "⚠️ File size (${file_size_mb} MB) exceeds ${max_size_mb} MB, splitting into parts"
         
         local dir_path=$(dirname "$file_path")
         local base_name=$(basename "$file_path")
@@ -38,17 +42,27 @@ split_large_file() {
         mkdir -p "$temp_dir"
         mv "$file_path" "$temp_dir/"
         
-        cd "$temp_dir"
+        pushd "$temp_dir" > /dev/null
         zip -s "${max_size_mb}m" "${name_without_ext}.zip" "$base_name"
+        local zip_result=$?
         rm -f "$base_name"
         mv "${name_without_ext}.zip"* "$dir_path/"
-        cd - > /dev/null
+        popd > /dev/null
         
         rm -rf "$temp_dir"
-        echo "✅ SUCCESS: File split into multiple parts (${name_without_ext}.zip, ${name_without_ext}.z01, ...)"
+        
+        if [ $zip_result -eq 0 ]; then
+            echo "✅ SUCCESS: File split into multiple parts:"
+            ls -la "${dir_path}/${name_without_ext}.zip"* 2>/dev/null | awk '{print "   - " $9 " (" $5 " bytes)"}'
+            return 0
+        else
+            echo "❌ ERROR: ZIP splitting failed"
+            return 1
+        fi
+    else
+        echo "✅ File size (${file_size} bytes) is within limit, no splitting needed"
         return 0
     fi
-    return 1
 }
 
 # ============================================
@@ -77,12 +91,25 @@ download_direct_file() {
     mv "$temp_dir/$filename" "$target_file"
     rm -rf "$temp_dir"
     
-    # Split large file if needed
+    # Split large file if needed - THIS MUST HAPPEN BEFORE git add
     if [ "$SPLIT_LARGE_FILES" = "true" ]; then
+        echo "🔪 Checking if file needs splitting..."
         split_large_file "$target_file" "$MAX_ZIP_SIZE_MB"
+        local split_result=$?
+        
+        # If split was successful, remove the original large file
+        if [ $split_result -eq 0 ]; then
+            # Check if split actually created files (i.e., file was large)
+            local base_name=$(basename "$target_file")
+            local name_without_ext="${base_name%.*}"
+            if [ -f "${target_dir}/${name_without_ext}.zip" ] || [ -f "${target_dir}/${name_without_ext}.z01" ]; then
+                echo "🗑️ Removing original large file: $target_file"
+                rm -f "$target_file"
+            fi
+        fi
     fi
     
-    echo "✅ SUCCESS: Saved to $target_file"
+    echo "✅ SUCCESS: Direct file processing completed"
     return 0
 }
 
