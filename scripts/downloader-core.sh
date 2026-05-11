@@ -15,7 +15,7 @@ mkdir -p "$DOWNLOAD_BASE"
 mkdir -p "$DOWNLOAD_BASE/files"
 
 # ----------------------------------------------------------------------
-# Split a large file into ZIP parts (exactly like your SoundCloud scripts)
+# Split a large file into ZIP parts (NO cd, NO pushd - uses absolute paths)
 # ----------------------------------------------------------------------
 split_large_file() {
     local file_path="$1"
@@ -33,16 +33,24 @@ split_large_file() {
         local temp_dir="$dir_path/temp_split_$$"
         
         mkdir -p "$temp_dir"
-        mv "$file_path" "$temp_dir/"
+        cp "$file_path" "$temp_dir/"
         
-        cd "$temp_dir"
-        zip -s "${max_size_mb}m" "${name_without_ext}.zip" "$base_name"
-        rm -f "$base_name"
-        mv "${name_without_ext}.zip"* "$dir_path/"
-        cd - > /dev/null
+        # Run zip from the temp directory using absolute paths
+        (cd "$temp_dir" && zip -s "${max_size_mb}m" "${name_without_ext}.zip" "$base_name" > /dev/null)
         
+        # Move the split parts back
+        for part in "$temp_dir/${name_without_ext}.zip"*; do
+            if [ -f "$part" ]; then
+                mv "$part" "$dir_path/"
+            fi
+        done
+        
+        # Clean up
         rm -rf "$temp_dir"
-        echo "SUCCESS: File split into multiple parts"
+        rm -f "$file_path"
+        
+        echo "SUCCESS: File split into multiple parts in $dir_path"
+        ls -la "$dir_path/${name_without_ext}.zip"* 2>/dev/null
         return 0
     fi
     return 1
@@ -74,12 +82,9 @@ download_direct_file() {
     
     if [ "$SPLIT_LARGE_FILES" = "true" ]; then
         split_large_file "$target_file" "$MAX_ZIP_SIZE_MB"
-        if [ $? -eq 0 ]; then
-            rm -f "$target_file"
-        fi
     fi
     
-    echo "SUCCESS: Saved to $target_file"
+    echo "SUCCESS: Direct file processing completed"
     return 0
 }
 
@@ -134,10 +139,10 @@ case "$PLATFORM" in
         fi
         ;;
     youtube)
-        echo "YouTube download is temporarily disabled. Check back later."
+        echo "⚠️ YouTube download is temporarily disabled. Check back later."
         ;;
     instagram)
-        echo "Instagram download is temporarily disabled. Check back later."
+        echo "⚠️ Instagram download is temporarily disabled. Check back later."
         ;;
     tiktok)
         ./scripts/tiktok/single.sh "$URL"
