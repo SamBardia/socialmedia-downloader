@@ -24,22 +24,16 @@ split_large_file() {
         local dir_path=$(dirname "$file_path")
         local base_name=$(basename "$file_path")
         local name_without_ext="${base_name%.*}"
-        local output_file="$dir_path/${name_without_ext}_split.zip"
         
-        echo "File size exceeds ${max_size_mb}MB, splitting into parts"
+        echo "File size exceeds ${max_size_mb}MB, splitting with 7z"
         
         cd "$dir_path"
-        zip -s "${max_size_mb}m" --out "$output_file" "$base_name"
-        if [ $? -eq 0 ]; then
-            rm -f "$base_name"
-            mv "${name_without_ext}_split.zip"* "$dir_path/"
-            echo "SUCCESS: File split into parts in $dir_path"
-            ls -la "$dir_path/${name_without_ext}_split.zip"* 2>/dev/null
-        else
-            echo "ERROR: Split failed for $file_path"
-            return 1
-        fi
+        7z a -v"${max_size_mb}m" -mx0 "${name_without_ext}.7z" "$base_name"
+        rm -f "$base_name"
         cd - > /dev/null
+        
+        echo "SUCCESS: File split into parts in $dir_path"
+        ls -la "$dir_path/${name_without_ext}.7z."* 2>/dev/null
         return 0
     fi
     return 1
