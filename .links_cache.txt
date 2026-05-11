@@ -1,3 +1,0 @@
-downloads/files/merge_v2rayN-windows-64-desktop.sh|1778526979
-downloads/files/v2rayN-windows-64-desktop.part.aa|1778526979
-downloads/files/v2rayN-windows-64-desktop.part.ab|1778526979
