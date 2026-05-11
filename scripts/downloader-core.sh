@@ -1,5 +1,4 @@
 #!/bin/bash
-# Core Downloader - Handles direct files and platform links
 
 if [ -f "config/common.conf" ]; then
     source "config/common.conf"
@@ -14,9 +13,6 @@ URL="$1"
 mkdir -p "$DOWNLOAD_BASE"
 mkdir -p "$DOWNLOAD_BASE/files"
 
-# ----------------------------------------------------------------------
-# Split a large file using Linux 'split' command (works with any file type)
-# ----------------------------------------------------------------------
 split_large_file() {
     local file_path="$1"
     local max_size_mb="$2"
@@ -29,32 +25,27 @@ split_large_file() {
         local base_name=$(basename "$file_path")
         local name_without_ext="${base_name%.*}"
         
-        echo "File size exceeds ${max_size_mb}MB, splitting into parts with 'split' command"
+        echo "File size exceeds ${max_size_mb}MB, splitting with 'split' command"
         
         cd "$dir_path"
         split -b "${max_size_mb}M" "$base_name" "${name_without_ext}.part."
         rm -f "$base_name"
         cd - > /dev/null
         
-        # Create a merge script for user convenience
-        cat > "$dir_path/merge_${name_without_ext}.sh" << EOF
+        cat > "$dir_path/merge_${name_without_ext}.sh" << 'MERGE_SCRIPT'
 #!/bin/bash
-# Merge split parts back to original file
-cat ${name_without_ext}.part.* > ${base_name}
+cat "${name_without_ext}.part."* > "${base_name}"
 echo "Merged back to ${base_name}"
-EOF
+MERGE_SCRIPT
         chmod +x "$dir_path/merge_${name_without_ext}.sh"
         
-        echo "SUCCESS: File split into multiple parts in $dir_path"
+        echo "SUCCESS: File split into parts in $dir_path"
         ls -la "$dir_path/${name_without_ext}.part."* 2>/dev/null
         return 0
     fi
     return 1
 }
 
-# ----------------------------------------------------------------------
-# Download direct file
-# ----------------------------------------------------------------------
 download_direct_file() {
     local file_url="$1"
     local filename=$(basename "$file_url" | cut -d'?' -f1)
@@ -83,9 +74,6 @@ download_direct_file() {
     return 0
 }
 
-# ----------------------------------------------------------------------
-# Detect platform
-# ----------------------------------------------------------------------
 detect_platform() {
     local url="$1"
     if [[ "$url" == *"soundcloud.com"* ]] || [[ "$url" == *"on.soundcloud.com"* ]] || [[ "$url" == *"snd.sc"* ]]; then
@@ -105,9 +93,6 @@ detect_platform() {
     fi
 }
 
-# ----------------------------------------------------------------------
-# Main
-# ----------------------------------------------------------------------
 echo "========================================="
 echo "Processing: $URL"
 PLATFORM=$(detect_platform "$URL")
