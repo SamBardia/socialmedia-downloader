@@ -3,7 +3,7 @@
 # ============================================
 # Twitter Single Tweet Downloader
 # Downloads media if present, otherwise saves text and metadata.
-# Includes like_count, repost_count, reply_count, view_count
+# Fixed: Tweet text extraction for tweets without media
 # ============================================
 
 if [ -f "config/twitter.conf" ]; then
@@ -11,14 +11,24 @@ if [ -f "config/twitter.conf" ]; then
 fi
 
 DOWNLOAD_PATH="${DOWNLOAD_PATH:-downloads/twitter}"
-MAX_ZIP_SIZE_MB="${MAX_ZIP_SIZE_MB:-90}"
-SPLIT_LARGE_FILES="${SPLIT_LARGE_FILES:-true}"
 
 URL="$1"
 
 # Helper function to sanitize filenames
 sanitize_filename() {
     echo "$1" | sed 's/[\/\\:*?"<>|]/_/g' | sed 's/[[:space:]]\+/_/g' | sed 's/^_//;s/_$//'
+}
+
+# Function to extract tweet text properly
+extract_tweet_text() {
+    local title="$1"
+    # Remove "User on X: " or "User / X" patterns
+    local text=$(echo "$title" | sed -E 's/^[^:]+:[[:space:]]*//' | sed 's/ \/ X$//')
+    # If result is empty or just whitespace, try original
+    if [ -z "$(echo "$text" | tr -d '[:space:]')" ]; then
+        text="$title"
+    fi
+    echo "$text"
 }
 
 mkdir -p "$DOWNLOAD_PATH"
@@ -49,13 +59,15 @@ if [ -n "$MEDIA_COUNT" ] && [ "$MEDIA_COUNT" -gt 0 ]; then
     HAS_MEDIA=true
 fi
 
-# Extract tweet text (description)
-DESCRIPTION=$(echo "$METADATA" | jq -r '.description // empty')
-if [ -z "$DESCRIPTION" ]; then
-    DESCRIPTION=$(echo "$METADATA" | jq -r '.title // empty')
-    DESCRIPTION=$(echo "$DESCRIPTION" | sed 's/^X 上的 //' | sed 's/ \/ X$//')
-fi
-if [ -z "$DESCRIPTION" ]; then
+# Extract tweet text - FIXED
+TITLE_TEXT=$(echo "$METADATA" | jq -r '.title // empty')
+DESCRIPTION_TEXT=$(echo "$METADATA" | jq -r '.description // empty')
+
+if [ -n "$TITLE_TEXT" ] && [ "$TITLE_TEXT" != "null" ]; then
+    DESCRIPTION=$(extract_tweet_text "$TITLE_TEXT")
+elif [ -n "$DESCRIPTION_TEXT" ] && [ "$DESCRIPTION_TEXT" != "null" ]; then
+    DESCRIPTION="$DESCRIPTION_TEXT"
+else
     DESCRIPTION="[Text content not available]"
 fi
 
