@@ -22,6 +22,14 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
+      - name: Restore timestamp cache
+        uses: actions/cache/restore@v4
+        with:
+          path: .links_cache.txt
+          key: links-cache-${{ github.run_id }}
+          restore-keys: |
+            links-cache-
+
       - name: Install dependencies
         run: |
           sudo apt-get update
@@ -47,70 +55,3 @@ jobs:
           else
             touch youtube_cookies.txt
           fi
-
-      - name: Process URLs
-        env:
-          YOUTUBE_COOKIES: ${{ secrets.YOUTUBE_COOKIES }}
-          INSTAGRAM_COOKIES: ${{ secrets.INSTAGRAM_COOKIES }}
-          TWITTER_PROFILE_COUNT: ${{ github.event.inputs.twitter_profile_count }}
-        run: |
-          # Create temporary download directory
-          mkdir -p tmp_downloads
-          
-          # Process each URL one by one
-          IFS=$'\n'
-          for URL in $(echo "${{ github.event.inputs.urls }}" | tr ',' '\n' | tr ' ' '\n' | sed 's/^[[:space:]]*//;s/[[:space:]]*$//'); do
-            [ -z "$URL" ] && continue
-            echo "========================================="
-            echo "Processing: $URL"
-            echo "========================================="
-            
-            # Detect if it's a platform URL or direct file
-            if [[ "$URL" =~ (youtube\.com|youtu\.be|soundcloud\.com|on\.soundcloud\.com|x\.com|twitter\.com|instagram\.com|tiktok\.com) ]]; then
-              echo "Platform URL → using existing scripts"
-              ./scripts/downloader-core.sh "$URL"
-            else
-              echo "Direct file → using aria2"
-              aria2c --split=2 --max-connection-per-server=2 --dir="tmp_downloads" "$URL"
-              
-              # Move to appropriate folder based on file extension
-              for FILE in tmp_downloads/*; do
-                if [ -f "$FILE" ]; then
-                  FILENAME=$(basename "$FILE")
-                  mkdir -p downloads/files
-                  mv "$FILE" "downloads/files/$FILENAME"
-                fi
-              done
-            fi
-            
-            # After each download, update links
-            ./scripts/create_links.sh
-            
-            # Push after each download to avoid large batches
-            git config user.name "github-actions[bot]"
-            git config user.email "github-actions[bot]@users.noreply.github.com"
-            git add downloads/ Links.md Links.fa.md
-            git diff --cached --quiet || git commit -m "Add downloaded content and update links [skip ci]"
-            git pull --rebase origin main || true
-            git push
-          done
-          
-          rm -rf tmp_downloads
-
-      - name: Final push (in case of any remaining changes)
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add downloads/ Links.md Links.fa.md
-          git diff --cached --quiet || git commit -m "Final update of downloaded content [skip ci]"
-          git pull --rebase origin main || true
-          git push
-
-      - name: Display summary
-        run: |
-          echo "========================================="
-          echo "Download summary"
-          echo "========================================="
-          for dir in downloads/*/; do
-            [ -d "$dir" ] && echo "📁 $(basename "$dir"): $(ls -1 "$dir" | wc -l) items"
-          done
