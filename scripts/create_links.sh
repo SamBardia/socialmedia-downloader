@@ -1,7 +1,7 @@
 #!/bin/bash
 # ============================================
 # Create Links.md and Links.fa.md
-# New structure: Group by date, append new dates at top, preserve history
+# Group by date, newest first, preserve history
 # ============================================
 
 DOWNLOAD_BASE="downloads"
@@ -96,89 +96,74 @@ if [ -s "$NEW_CACHE" ]; then
     mv "$NEW_CACHE" "$CACHE_FILE"
 fi
 
-# Group by date (using UTC date for grouping to keep both versions aligned)
+# Sort by timestamp (newest first)
 sort -rn "$ALL_FILES" > "$TEMP_DIR/sorted_files.txt"
 
-declare -A groups
+# Build new content lines (using arrays to avoid \n issues)
+NEW_CONTENT_EN=()
+NEW_CONTENT_FA=()
+current_date=""
+
 while IFS='|' read -r ts time_utc time_tehran filename size_fmt blob_url; do
     date_key=$(echo "$time_utc" | cut -d' ' -f1)
-    if [ -z "${groups[$date_key]}" ]; then
-        groups[$date_key]=""
+    
+    if [ "$date_key" != "$current_date" ]; then
+        current_date="$date_key"
+        NEW_CONTENT_EN+=("### 📅 ${time_utc}")
+        NEW_CONTENT_FA+=("### 📅 ${time_tehran}")
     fi
-    groups[$date_key]="${groups[$date_key]}$ts|$time_utc|$time_tehran|$filename|$size_fmt|$blob_url\n"
+    
+    NEW_CONTENT_EN+=("- [${filename}](${blob_url}) (${size_fmt})")
+    NEW_CONTENT_FA+=("- [${filename}](${blob_url}) (${size_fmt})")
 done < "$TEMP_DIR/sorted_files.txt"
 
-# Create new content for English and Persian
-NEW_CONTENT_EN=""
-NEW_CONTENT_FA=""
-
-for date_key in $(echo "${!groups[@]}" | tr ' ' '\n' | sort -r); do
-    entries="${groups[$date_key]}"
-    # Get the first entry to extract the time string
-    first_entry=$(echo -e "$entries" | head -1)
-    time_utc_first=$(echo "$first_entry" | cut -d'|' -f2)
-    time_tehran_first=$(echo "$first_entry" | cut -d'|' -f3)
-    
-    # Add date header
-    NEW_CONTENT_EN="${NEW_CONTENT_EN}### 📅 ${time_utc_first}\n"
-    NEW_CONTENT_FA="${NEW_CONTENT_FA}### 📅 ${time_tehran_first}\n"
-    
-    # Add entries for this date
-    echo -e "$entries" | while IFS='|' read -r ts time_utc time_tehran filename size_fmt blob_url; do
-        NEW_CONTENT_EN="${NEW_CONTENT_EN}- [${filename}](${blob_url}) (${size_fmt})\n"
-        NEW_CONTENT_FA="${NEW_CONTENT_FA}- [${filename}](${blob_url}) (${size_fmt})\n"
-    done
-    NEW_CONTENT_EN="${NEW_CONTENT_EN}\n"
-    NEW_CONTENT_FA="${NEW_CONTENT_FA}\n"
-done
-
-# Read existing content (if any)
+# Read existing content (skip header lines)
 OLD_CONTENT_EN=""
 OLD_CONTENT_FA=""
 if [ -f "$LINKS_FILE" ]; then
-    # Extract only the links section (after the first two lines of header)
-    OLD_CONTENT_EN=$(sed -n '3,$p' "$LINKS_FILE" 2>/dev/null || echo "")
+    OLD_CONTENT_EN=$(tail -n +3 "$LINKS_FILE" 2>/dev/null | sed '/^$/d' || echo "")
 fi
 if [ -f "$LINKS_FILE_FA" ]; then
-    OLD_CONTENT_FA=$(sed -n '4,$p' "$LINKS_FILE_FA" 2>/dev/null || echo "")
-fi
-
-# Merge: new content first, then old content
-FINAL_CONTENT_EN=""
-FINAL_CONTENT_FA=""
-
-if [ -n "$NEW_CONTENT_EN" ]; then
-    FINAL_CONTENT_EN="${NEW_CONTENT_EN}\n${OLD_CONTENT_EN}"
-else
-    FINAL_CONTENT_EN="${OLD_CONTENT_EN}"
-fi
-
-if [ -n "$NEW_CONTENT_FA" ]; then
-    FINAL_CONTENT_FA="${NEW_CONTENT_FA}\n${OLD_CONTENT_FA}"
-else
-    FINAL_CONTENT_FA="${OLD_CONTENT_FA}"
+    OLD_CONTENT_FA=$(tail -n +4 "$LINKS_FILE_FA" 2>/dev/null | sed '/^$/d' || echo "")
 fi
 
 # Write English file
-cat > "$LINKS_FILE" <<EOF
-# 🔗 Direct Download Links
-
-Click on any link below to start downloading directly.
-
-${FINAL_CONTENT_EN}
-EOF
+{
+    echo "# 🔗 Direct Download Links"
+    echo ""
+    echo "Click on any link below to start downloading directly."
+    echo ""
+    
+    if [ ${#NEW_CONTENT_EN[@]} -gt 0 ]; then
+        printf "%s\n" "${NEW_CONTENT_EN[@]}"
+        echo ""
+    fi
+    
+    if [ -n "$OLD_CONTENT_EN" ]; then
+        echo "$OLD_CONTENT_EN"
+    fi
+} > "$LINKS_FILE"
 
 # Write Persian file
-cat > "$LINKS_FILE_FA" <<EOF
-<div dir="rtl">
-
-# 🔗 لینک‌های دانلود مستقیم
-
-برای دانلود، روی هر لینک کلیک کنید.
-
-${FINAL_CONTENT_FA}
-</div>
-EOF
+{
+    echo "<div dir=\"rtl\">"
+    echo ""
+    echo "# 🔗 لینک‌های دانلود مستقیم"
+    echo ""
+    echo "برای دانلود، روی هر لینک کلیک کنید."
+    echo ""
+    
+    if [ ${#NEW_CONTENT_FA[@]} -gt 0 ]; then
+        printf "%s\n" "${NEW_CONTENT_FA[@]}"
+        echo ""
+    fi
+    
+    if [ -n "$OLD_CONTENT_FA" ]; then
+        echo "$OLD_CONTENT_FA"
+    fi
+    
+    echo "</div>"
+} > "$LINKS_FILE_FA"
 
 rm -rf "$TEMP_DIR"
 
