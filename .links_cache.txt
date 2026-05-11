@@ -19,6 +19,7 @@ downloads/files/ChromeStandaloneSetup64.z01|1778514654
 downloads/files/ChromeStandaloneSetup64.zip|1778514657
 downloads/files/596.36-notebook-win10-win11-64bit-international-nsd-dch-whql.z02|1778514681
 downloads/files/mpam-fe.z01|1778514233
+downloads/files/wfc6setup.exe|1778515539
 downloads/files/596.36-notebook-win10-win11-64bit-international-nsd-dch-whql.z05|1778514688
 downloads/files/596.36-notebook-win10-win11-64bit-international-nsd-dch-whql.z09|1778514697
 downloads/files/596.36-notebook-win10-win11-64bit-international-nsd-dch-whql.z07|1778514692
