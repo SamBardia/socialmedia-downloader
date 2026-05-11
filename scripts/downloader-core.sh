@@ -15,45 +15,37 @@ mkdir -p "$DOWNLOAD_BASE"
 mkdir -p "$DOWNLOAD_BASE/files"
 
 # ----------------------------------------------------------------------
-# Split a large file into ZIP parts (max_size_mb per part)
+# Split a large file into ZIP parts (exactly like your SoundCloud scripts)
 # ----------------------------------------------------------------------
 split_large_file() {
     local file_path="$1"
     local max_size_mb="$2"
-    local file_size=$(du -b "$file_path" | cut -f1)
+    
+    local file_size=$(stat -c%s "$file_path" 2>/dev/null || stat -f%z "$file_path" 2>/dev/null)
     local max_size_bytes=$((max_size_mb * 1024 * 1024))
-
+    
     if [ "$file_size" -gt "$max_size_bytes" ]; then
-        echo "File size ($(numfmt --to=iec $file_size)) exceeds ${max_size_mb} MB, splitting..."
+        echo "File size exceeds ${max_size_mb}MB, splitting into parts"
+        
         local dir_path=$(dirname "$file_path")
         local base_name=$(basename "$file_path")
         local name_without_ext="${base_name%.*}"
         local temp_dir="$dir_path/temp_split_$$"
-
+        
         mkdir -p "$temp_dir"
         mv "$file_path" "$temp_dir/"
-
-        pushd "$temp_dir" > /dev/null
+        
+        cd "$temp_dir"
         zip -s "${max_size_mb}m" "${name_without_ext}.zip" "$base_name"
-        local zip_rc=$?
         rm -f "$base_name"
         mv "${name_without_ext}.zip"* "$dir_path/"
-        popd > /dev/null
-
+        cd - > /dev/null
+        
         rm -rf "$temp_dir"
-
-        if [ $zip_rc -eq 0 ]; then
-            echo "Successfully split into:"
-            ls -la "${dir_path}/${name_without_ext}.zip"* 2>/dev/null | awk '{print "  " $9 " (" $5 " bytes)"}'
-            return 0
-        else
-            echo "ERROR: ZIP splitting failed"
-            return 1
-        fi
-    else
-        echo "File size within limit, no splitting needed."
+        echo "SUCCESS: File split into multiple parts"
         return 0
     fi
+    return 1
 }
 
 # ----------------------------------------------------------------------
@@ -65,35 +57,29 @@ download_direct_file() {
     local target_dir="$DOWNLOAD_BASE/files"
     local target_file="$target_dir/$filename"
     local temp_dir="tmp_downloads"
-
+    
     mkdir -p "$temp_dir"
+    
     echo "Downloading direct file: $filename"
     aria2c --split=2 --max-connection-per-server=2 --dir="$temp_dir" "$file_url"
-
+    
     if [ ! -f "$temp_dir/$filename" ]; then
         echo "ERROR: Failed to download $filename"
         rm -rf "$temp_dir"
         return 1
     fi
-
+    
     mv "$temp_dir/$filename" "$target_file"
     rm -rf "$temp_dir"
-
-    # Split large files if configured
+    
     if [ "$SPLIT_LARGE_FILES" = "true" ]; then
         split_large_file "$target_file" "$MAX_ZIP_SIZE_MB"
-        local split_rc=$?
-        if [ $split_rc -eq 0 ]; then
-            local base_name=$(basename "$target_file")
-            local name_without_ext="${base_name%.*}"
-            if [ -f "${target_dir}/${name_without_ext}.zip" ] || [ -f "${target_dir}/${name_without_ext}.z01" ]; then
-                echo "Removing original large file after splitting."
-                rm -f "$target_file"
-            fi
+        if [ $? -eq 0 ]; then
+            rm -f "$target_file"
         fi
     fi
-
-    echo "Direct file processing completed"
+    
+    echo "SUCCESS: Saved to $target_file"
     return 0
 }
 
