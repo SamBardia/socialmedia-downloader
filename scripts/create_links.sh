@@ -1,7 +1,7 @@
 #!/bin/bash
 # ============================================
-# Create Links.md (English & Persian)
-# With persistent file timestamp cache using GitHub Actions cache
+# Create Links.md and Links.fa.md
+# New structure: Group by date, append new dates at top, preserve history
 # ============================================
 
 DOWNLOAD_BASE="downloads"
@@ -32,26 +32,6 @@ format_size() {
     fi
 }
 
-get_platform() {
-    local file_path="$1"
-    if [[ "$file_path" == *"/soundcloud/"* ]]; then
-        echo "SoundCloud"
-    elif [[ "$file_path" == *"/twitter/"* ]]; then
-        echo "Twitter"
-    elif [[ "$file_path" == *"/youtube/"* ]]; then
-        echo "YouTube"
-    elif [[ "$file_path" == *"/instagram/"* ]]; then
-        echo "Instagram"
-    elif [[ "$file_path" == *"/tiktok/"* ]]; then
-        echo "TikTok"
-    elif [[ "$file_path" == *"/files/"* ]]; then
-        echo "Direct Link"
-    else
-        echo "Other"
-    fi
-}
-
-# Get creation time of file (birth time) if available, fallback to modification time
 get_file_time() {
     local file="$1"
     local timestamp=$(stat -c %W "$file" 2>/dev/null)
@@ -61,14 +41,17 @@ get_file_time() {
     echo "$timestamp"
 }
 
-format_time() {
+format_time_utc() {
     local timestamp="$1"
-    local tz="$2"
-    export TZ="$tz"
-    date -d "@$timestamp" +"%Y-%m-%d %H:%M:%S" 2>/dev/null || date -r "$timestamp" +"%Y-%m-%d %H:%M:%S"
+    TZ="UTC" date -d "@$timestamp" +"%Y-%m-%d %H:%M UTC" 2>/dev/null || date -r "$timestamp" +"%Y-%m-%d %H:%M UTC"
 }
 
-# Load existing cache if present
+format_time_tehran() {
+    local timestamp="$1"
+    TZ="Asia/Tehran" date -d "@$timestamp" +"%Y-%m-%d %H:%M تهران" 2>/dev/null || date -r "$timestamp" +"%Y-%m-%d %H:%M تهران"
+}
+
+# Load existing cache
 declare -A file_cache
 if [ -f "$CACHE_FILE" ]; then
     while IFS='|' read -r path timestamp; do
@@ -76,24 +59,22 @@ if [ -f "$CACHE_FILE" ]; then
     done < "$CACHE_FILE"
 fi
 
-# Collect current files and update cache
+# Collect current files
 TEMP_DIR=$(mktemp -d)
-SORTED_DATA="$TEMP_DIR/sorted_data.txt"
-> "$SORTED_DATA"
 NEW_CACHE="$TEMP_DIR/new_cache.txt"
+ALL_FILES="$TEMP_DIR/all_files.txt"
+> "$ALL_FILES"
+> "$NEW_CACHE"
 
 while IFS= read -r file; do
     if [[ "$file" == "$LINKS_FILE" ]] || [[ "$file" == "$LINKS_FILE_FA" ]] || [[ "$file" == "$CACHE_FILE" ]]; then
         continue
     fi
     
-    # Get file timestamp (creation or modification)
     current_time=$(get_file_time "$file")
     
-    # Use cached timestamp if available, otherwise use current and add to new cache
     if [ -n "${file_cache[$file]}" ]; then
         timestamp="${file_cache[$file]}"
-        # Still keep this file in new cache (preserve old timestamp)
         echo "$file|$timestamp" >> "$NEW_CACHE"
     else
         timestamp="$current_time"
@@ -103,87 +84,102 @@ while IFS= read -r file; do
     filename=$(basename "$file")
     size=$(stat -c%s "$file" 2>/dev/null || stat -f%z "$file" 2>/dev/null)
     size_fmt=$(format_size "$size")
-    platform=$(get_platform "$file")
-    time_utc=$(format_time "$timestamp" "UTC")
-    time_tehran=$(format_time "$timestamp" "Asia/Tehran")
     blob_url=$(get_blob_url "$file")
+    time_utc=$(format_time_utc "$timestamp")
+    time_tehran=$(format_time_tehran "$timestamp")
     
-    printf "%s|%s|%s|%s|%s|%s|%s\n" \
-        "$timestamp" "$filename" "$platform" "$size_fmt" "$time_utc" "$time_tehran" "$blob_url" >> "$SORTED_DATA"
+    echo "$timestamp|$time_utc|$time_tehran|$filename|$size_fmt|$blob_url" >> "$ALL_FILES"
 done < <(find "$DOWNLOAD_BASE" -type f ! -path "*/\.*" 2>/dev/null)
 
-# Update cache file with current files
+# Update cache
 if [ -s "$NEW_CACHE" ]; then
     mv "$NEW_CACHE" "$CACHE_FILE"
 fi
 
-# Sort by timestamp (newest first)
-sort -rn "$SORTED_DATA" > "${SORTED_DATA}.sorted"
-mv "${SORTED_DATA}.sorted" "$SORTED_DATA"
+# Group by date (using UTC date for grouping to keep both versions aligned)
+sort -rn "$ALL_FILES" > "$TEMP_DIR/sorted_files.txt"
 
-# Initialize markdown files
-cat > "$LINKS_FILE" <<'EOF'
-# 📦 Download Links
+declare -A groups
+while IFS='|' read -r ts time_utc time_tehran filename size_fmt blob_url; do
+    date_key=$(echo "$time_utc" | cut -d' ' -f1)
+    if [ -z "${groups[$date_key]}" ]; then
+        groups[$date_key]=""
+    fi
+    groups[$date_key]="${groups[$date_key]}$ts|$time_utc|$time_tehran|$filename|$size_fmt|$blob_url\n"
+done < "$TEMP_DIR/sorted_files.txt"
 
-> **How to download:** Click the link, then click the **Download** button on the GitHub page to save the file with its original name.
-> 
-> **Note:** Files that no longer exist in the repository will show "File not found" in the link column.
+# Create new content for English and Persian
+NEW_CONTENT_EN=""
+NEW_CONTENT_FA=""
 
-| # | Status | File | Platform | Size | Published (UTC) | Link |
-|---|--------|------|----------|------|----------------|------|
-EOF
+for date_key in $(echo "${!groups[@]}" | tr ' ' '\n' | sort -r); do
+    entries="${groups[$date_key]}"
+    # Get the first entry to extract the time string
+    first_entry=$(echo -e "$entries" | head -1)
+    time_utc_first=$(echo "$first_entry" | cut -d'|' -f2)
+    time_tehran_first=$(echo "$first_entry" | cut -d'|' -f3)
+    
+    # Add date header
+    NEW_CONTENT_EN="${NEW_CONTENT_EN}### 📅 ${time_utc_first}\n"
+    NEW_CONTENT_FA="${NEW_CONTENT_FA}### 📅 ${time_tehran_first}\n"
+    
+    # Add entries for this date
+    echo -e "$entries" | while IFS='|' read -r ts time_utc time_tehran filename size_fmt blob_url; do
+        NEW_CONTENT_EN="${NEW_CONTENT_EN}- [${filename}](${blob_url}) (${size_fmt})\n"
+        NEW_CONTENT_FA="${NEW_CONTENT_FA}- [${filename}](${blob_url}) (${size_fmt})\n"
+    done
+    NEW_CONTENT_EN="${NEW_CONTENT_EN}\n"
+    NEW_CONTENT_FA="${NEW_CONTENT_FA}\n"
+done
 
-cat > "$LINKS_FILE_FA" <<'EOF'
-<div dir="rtl">
-
-# 📦 لینک‌های دانلود
-
-> **نحوه دانلود:** روی لینک کلیک کنید، سپس در صفحه گیت‌هاب، روی دکمه **Download** کلیک کنید تا فایل با نام اصلی ذخیره شود.
-> 
-> **نکته:** فایل‌هایی که دیگر در مخزن وجود ندارند، در ستون لینک عبارت "فایل یافت نشد" نشان داده می‌شود.
-
-| # | وضعیت | نام فایل | پلتفرم | حجم | زمان انتشار (تهران) | لینک |
-|---|--------|----------|--------|------|----------------------|------|
-EOF
-
-counter=1
-if [ -f "$SORTED_DATA" ]; then
-    while IFS='|' read -r timestamp filename platform size_fmt time_utc time_tehran blob_url; do
-        [ -z "$filename" ] && continue
-        
-        # Check if file still exists
-        file_exists=false
-        if [ -f "$file" ] 2>/dev/null; then
-            file_exists=true
-        fi
-        
-        if [ "$file_exists" = true ]; then
-            status_icon="✅"
-            status_fa="✅"
-            link_btn="<a href=\"$blob_url\" target=\"_blank\">View</a>"
-            link_fa="<a href=\"$blob_url\" target=\"_blank\">مشاهده</a>"
-        else
-            status_icon="❌"
-            status_fa="❌"
-            link_btn="File not found"
-            link_fa="فایل یافت نشد"
-        fi
-        
-        # English table row
-        printf "| %d | %s | %s | %s | %s | %s | %s |\n" \
-            "$counter" "$status_icon" "$filename" "$platform" "$size_fmt" "$time_utc" "$link_btn" >> "$LINKS_FILE"
-        
-        # Persian table row
-        printf "| %d | %s | %s | %s | %s | %s | %s |\n" \
-            "$counter" "$status_fa" "$filename" "$platform" "$size_fmt" "$time_tehran" "$link_fa" >> "$LINKS_FILE_FA"
-        
-        counter=$((counter + 1))
-    done < "$SORTED_DATA"
+# Read existing content (if any)
+OLD_CONTENT_EN=""
+OLD_CONTENT_FA=""
+if [ -f "$LINKS_FILE" ]; then
+    # Extract only the links section (after the first two lines of header)
+    OLD_CONTENT_EN=$(sed -n '3,$p' "$LINKS_FILE" 2>/dev/null || echo "")
+fi
+if [ -f "$LINKS_FILE_FA" ]; then
+    OLD_CONTENT_FA=$(sed -n '4,$p' "$LINKS_FILE_FA" 2>/dev/null || echo "")
 fi
 
-echo "" >> "$LINKS_FILE_FA"
-echo "</div>" >> "$LINKS_FILE_FA"
+# Merge: new content first, then old content
+FINAL_CONTENT_EN=""
+FINAL_CONTENT_FA=""
+
+if [ -n "$NEW_CONTENT_EN" ]; then
+    FINAL_CONTENT_EN="${NEW_CONTENT_EN}\n${OLD_CONTENT_EN}"
+else
+    FINAL_CONTENT_EN="${OLD_CONTENT_EN}"
+fi
+
+if [ -n "$NEW_CONTENT_FA" ]; then
+    FINAL_CONTENT_FA="${NEW_CONTENT_FA}\n${OLD_CONTENT_FA}"
+else
+    FINAL_CONTENT_FA="${OLD_CONTENT_FA}"
+fi
+
+# Write English file
+cat > "$LINKS_FILE" <<EOF
+# 🔗 Direct Download Links
+
+Click on any link below to start downloading directly.
+
+${FINAL_CONTENT_EN}
+EOF
+
+# Write Persian file
+cat > "$LINKS_FILE_FA" <<EOF
+<div dir="rtl">
+
+# 🔗 لینک‌های دانلود مستقیم
+
+برای دانلود، روی هر لینک کلیک کنید.
+
+${FINAL_CONTENT_FA}
+</div>
+EOF
 
 rm -rf "$TEMP_DIR"
 
-echo "✅ Links created: $LINKS_FILE and $LINKS_FILE_FA ($((counter-1)) files, newest first)"
+echo "✅ Links created: $LINKS_FILE and $LINKS_FILE_FA"
