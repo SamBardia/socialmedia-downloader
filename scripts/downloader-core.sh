@@ -13,109 +13,94 @@ SPLIT_LARGE_FILES="${SPLIT_LARGE_FILES:-true}"
 
 URL="$1"
 
-# Create downloads folder structure
 mkdir -p "$DOWNLOAD_BASE"
 mkdir -p "$DOWNLOAD_BASE/files"
 
-# ============================================
-# Function to split a large file into ZIP parts (RELIABLE VERSION)
-# ============================================
+# ------------------------------------------------------------
+# Split a large file into ZIP parts (max_size_mb per part)
+# ------------------------------------------------------------
 split_large_file() {
     local file_path="$1"
     local max_size_mb="$2"
-    
-    # Use du to get file size in bytes (more reliable than stat across systems)
     local file_size=$(du -b "$file_path" | cut -f1)
     local max_size_bytes=$((max_size_mb * 1024 * 1024))
-    
-    echo "DEBUG: File size = $file_size bytes, Max allowed = $max_size_bytes bytes"
-    
+
     if [ "$file_size" -gt "$max_size_bytes" ]; then
-        local file_size_mb=$(echo "scale=2; $file_size / 1048576" | bc)
-        echo "⚠️ File size (${file_size_mb} MB) exceeds ${max_size_mb} MB, splitting into parts"
-        
+        echo "File size ($(echo "scale=2; $file_size / 1048576" | bc) MB) exceeds ${max_size_mb} MB, splitting..."
         local dir_path=$(dirname "$file_path")
         local base_name=$(basename "$file_path")
         local name_without_ext="${base_name%.*}"
         local temp_dir="$dir_path/temp_split_$$"
-        
+
         mkdir -p "$temp_dir"
         mv "$file_path" "$temp_dir/"
-        
+
         pushd "$temp_dir" > /dev/null
         zip -s "${max_size_mb}m" "${name_without_ext}.zip" "$base_name"
-        local zip_result=$?
+        local zip_rc=$?
         rm -f "$base_name"
         mv "${name_without_ext}.zip"* "$dir_path/"
         popd > /dev/null
-        
+
         rm -rf "$temp_dir"
-        
-        if [ $zip_result -eq 0 ]; then
-            echo "✅ SUCCESS: File split into multiple parts:"
-            ls -la "${dir_path}/${name_without_ext}.zip"* 2>/dev/null | awk '{print "   - " $9 " (" $5 " bytes)"}'
+
+        if [ $zip_rc -eq 0 ]; then
+            echo "Successfully split into:"
+            ls -la "${dir_path}/${name_without_ext}.zip"* 2>/dev/null | awk '{print "  " $9 " (" $5 " bytes)"}'
             return 0
         else
-            echo "❌ ERROR: ZIP splitting failed"
+            echo "ERROR: ZIP splitting failed"
             return 1
         fi
     else
-        echo "✅ File size (${file_size} bytes) is within limit, no splitting needed"
+        echo "File size within limit, no splitting needed"
         return 0
     fi
 }
 
-# ============================================
-# Function to download a direct file URL using aria2
-# ============================================
+# ------------------------------------------------------------
+# Download a direct file URL using aria2
+# ------------------------------------------------------------
 download_direct_file() {
     local file_url="$1"
     local filename=$(basename "$file_url" | cut -d'?' -f1)
     local target_dir="$DOWNLOAD_BASE/files"
     local target_file="$target_dir/$filename"
     local temp_dir="tmp_downloads"
-    
+
     mkdir -p "$temp_dir"
-    
-    echo "📥 Downloading direct file: $filename"
+    echo "Downloading direct file: $filename"
     aria2c --split=2 --max-connection-per-server=2 --dir="$temp_dir" "$file_url"
-    
-    # Check if download was successful
+
     if [ ! -f "$temp_dir/$filename" ]; then
-        echo "❌ ERROR: Failed to download $filename"
+        echo "ERROR: Failed to download $filename"
         rm -rf "$temp_dir"
         return 1
     fi
-    
-    # Move file to target directory
+
     mv "$temp_dir/$filename" "$target_file"
     rm -rf "$temp_dir"
-    
-    # Split large file if needed - THIS MUST HAPPEN BEFORE git add
+
     if [ "$SPLIT_LARGE_FILES" = "true" ]; then
-        echo "🔪 Checking if file needs splitting..."
         split_large_file "$target_file" "$MAX_ZIP_SIZE_MB"
-        local split_result=$?
-        
-        # If split was successful, remove the original large file
-        if [ $split_result -eq 0 ]; then
-            # Check if split actually created files (i.e., file was large)
+        local split_rc=$?
+        if [ $split_rc -eq 0 ]; then
             local base_name=$(basename "$target_file")
             local name_without_ext="${base_name%.*}"
             if [ -f "${target_dir}/${name_without_ext}.zip" ] || [ -f "${target_dir}/${name_without_ext}.z01" ]; then
-                echo "🗑️ Removing original large file: $target_file"
+                echo "Removing original large file: $target_file"
                 rm -f "$target_file"
             fi
         fi
     fi
-    
-    echo "✅ SUCCESS: Direct file processing completed"
+
+    echo "Direct file processing completed"
     return 0
 }
 
-# ============================================
-# Function to detect platform
-# ============================================
+# ------------------------------------------------------------
+# Detect platform from URL
+# ------------------------------------------------------------
 detect_platform() {
     local url="$1"
     if [[ "$url" == *"soundcloud.com"* ]] || [[ "$url" == *"on.soundcloud.com"* ]] || [[ "$url" == *"snd.sc"* ]]; then
@@ -135,9 +120,9 @@ detect_platform() {
     fi
 }
 
-# ============================================
-# Main processing
-# ============================================
+# ------------------------------------------------------------
+# Main
+# ------------------------------------------------------------
 echo "========================================="
 echo "Processing: $URL"
 PLATFORM=$(detect_platform "$URL")
@@ -164,15 +149,15 @@ case "$PLATFORM" in
         fi
         ;;
     youtube)
-        echo "⚠️ YouTube download is temporarily disabled. Check back later."
+        echo "YouTube download is temporarily disabled. Check back later."
         ;;
     instagram)
-        echo "⚠️ Instagram download is temporarily disabled. Check back later."
+        echo "Instagram download is temporarily disabled. Check back later."
         ;;
     tiktok)
         ./scripts/tiktok/single.sh "$URL"
         ;;
     *)
-        echo "❌ WARNING: Unsupported platform for $URL"
+        echo "WARNING: Unsupported platform for $URL"
         ;;
 esac
