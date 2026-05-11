@@ -63,10 +63,11 @@ NEW_CACHE="$TEMP_DIR/new_cache.txt"
 > "$NEW_CACHE"
 
 while IFS= read -r file; do
-    # Skip link files and cache
     [[ "$file" == "$LINKS_FILE" || "$file" == "$LINKS_FILE_FA" || "$file" == "$CACHE_FILE" ]] && continue
     
-    # Get timestamp
+    # دیباگ
+    echo "DEBUG: Processing file = $file"
+    
     current_ts=$(get_file_time "$file")
     if [ -n "${cache[$file]}" ]; then
         ts="${cache[$file]}"
@@ -76,14 +77,11 @@ while IFS= read -r file; do
         echo "$file|$ts" >> "$NEW_CACHE"
     fi
     
-    # Extract filename (basename works correctly)
     filename=$(basename "$file")
+    echo "DEBUG: basename = $filename"
     
-    # Get file size
     size=$(stat -c%s "$file" 2>/dev/null || stat -f%z "$file" 2>/dev/null)
     size_fmt=$(format_size "$size")
-    
-    # Get URLs and times
     raw_url=$(get_raw_url "$file")
     time_utc=$(format_time_utc "$ts")
     time_tehran=$(format_time_tehran "$ts")
@@ -105,7 +103,6 @@ declare -a NEW_FA=()
 last_date=""
 
 while IFS='|' read -r ts time_utc time_tehran filename size_fmt raw_url; do
-    # Extract date part only for grouping
     date_utc=$(echo "$time_utc" | cut -d' ' -f1)
     
     if [ "$date_utc" != "$last_date" ]; then
@@ -153,4 +150,4 @@ done < "$TEMP_DIR/sorted.txt"
 
 rm -rf "$TEMP_DIR"
 
-echo "✅ Links created: $LINKS_FILE and $LINKS_FILE_FA ($(wc -l < "$FILES_DATA") files)"
+echo "✅ Links created: $LINKS_FILE and $LINKS_FILE_FA"
