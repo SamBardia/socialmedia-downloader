@@ -30,9 +30,7 @@ if [ -z "$TITLE" ]; then
     TITLE="unknown_title"
 fi
 
-# Remove artist name from title if it appears at the beginning
 TITLE=$(echo "$TITLE" | sed "s/^${ARTIST} - //g" | sed "s/^${ARTIST}//g" | sed 's/^ - //g')
-
 TITLE=$(echo "$TITLE" | sed 's/[\/\\:*?"<>|]/_/g')
 
 BASE_FILENAME="${ARTIST} - ${TITLE}"
@@ -43,6 +41,11 @@ while [ -f "$FINAL_FILENAME" ]; do
     FINAL_FILENAME="${BASE_FILENAME}(${COUNTER}).${EXTENSION}"
     COUNTER=$((COUNTER + 1))
 done
+
+# دیباگ
+echo "DEBUG: FINAL_FILENAME = $FINAL_FILENAME"
+echo "DEBUG: Current directory = $(pwd)"
+ls -la "$FINAL_FILENAME" 2>/dev/null || echo "DEBUG: File not found yet"
 
 python3 -m yt_dlp --extract-audio --audio-format "$AUDIO_FORMAT" \
     --embed-thumbnail --convert-thumbnails jpg \
