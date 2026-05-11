@@ -15,7 +15,7 @@ mkdir -p "$DOWNLOAD_BASE"
 mkdir -p "$DOWNLOAD_BASE/files"
 
 # ----------------------------------------------------------------------
-# Split a large file into ZIP parts (in-place, like youtube/single.sh)
+# Split a large file in-place (exactly like youtube/single.sh)
 # ----------------------------------------------------------------------
 split_large_file() {
     local file_path="$1"
@@ -31,7 +31,6 @@ split_large_file() {
         
         echo "File size exceeds ${max_size_mb}MB, splitting into parts"
         
-        # Go to the file's directory and split in-place
         cd "$dir_path"
         zip -s "${max_size_mb}m" "${name_without_ext}.zip" "$base_name"
         rm -f "$base_name"
@@ -45,7 +44,7 @@ split_large_file() {
 }
 
 # ----------------------------------------------------------------------
-# Download a direct file URL using aria2
+# Download direct file
 # ----------------------------------------------------------------------
 download_direct_file() {
     local file_url="$1"
@@ -55,7 +54,6 @@ download_direct_file() {
     local temp_dir="tmp_downloads"
     
     mkdir -p "$temp_dir"
-    
     echo "Downloading direct file: $filename"
     aria2c --split=2 --max-connection-per-server=2 --dir="$temp_dir" "$file_url"
     
@@ -77,7 +75,7 @@ download_direct_file() {
 }
 
 # ----------------------------------------------------------------------
-# Detect platform from URL
+# Detect platform
 # ----------------------------------------------------------------------
 detect_platform() {
     local url="$1"
