@@ -24,23 +24,24 @@ split_large_file() {
         local dir_path=$(dirname "$file_path")
         local base_name=$(basename "$file_path")
         local name_without_ext="${base_name%.*}"
+        local temp_dir="$dir_path/split_temp_$$"
         
-        echo "File size exceeds ${max_size_mb}MB, splitting with 'split' command"
+        echo "File size exceeds ${max_size_mb}MB, splitting into parts"
         
-        cd "$dir_path"
-        split -b "${max_size_mb}M" "$base_name" "${name_without_ext}.part."
+        mkdir -p "$temp_dir"
+        cp "$file_path" "$temp_dir/"
+        
+        cd "$temp_dir"
+        zip -s "${max_size_mb}m" "${name_without_ext}.zip" "$base_name"
         rm -f "$base_name"
+        mv "${name_without_ext}.zip"* "$dir_path/"
         cd - > /dev/null
         
-        cat > "$dir_path/merge_${name_without_ext}.sh" << 'MERGE_SCRIPT'
-#!/bin/bash
-cat "${name_without_ext}.part."* > "${base_name}"
-echo "Merged back to ${base_name}"
-MERGE_SCRIPT
-        chmod +x "$dir_path/merge_${name_without_ext}.sh"
+        rm -rf "$temp_dir"
+        rm -f "$file_path"
         
         echo "SUCCESS: File split into parts in $dir_path"
-        ls -la "$dir_path/${name_without_ext}.part."* 2>/dev/null
+        ls -la "$dir_path/${name_without_ext}.zip"* 2>/dev/null
         return 0
     fi
     return 1
