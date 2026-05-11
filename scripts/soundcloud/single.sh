@@ -1,6 +1,7 @@
 #!/bin/bash
 # ============================================
 # SoundCloud single track downloader
+# Fixed: Remove duplicate artist name from title
 # ============================================
 
 if [ -f "config/soundcloud.conf" ]; then
@@ -21,13 +22,17 @@ ARTIST=$(echo "$METADATA" | jq -r '.artist // .uploader // empty')
 if [ -z "$ARTIST" ]; then
     ARTIST="unknown_artist"
 fi
-# STEP 1: Replace unicode fullwidth comma with regular comma
 ARTIST=$(echo "$ARTIST" | perl -CSD -pe 's/\x{ff0c}/,/g' 2>/dev/null || echo "$ARTIST" | sed 's/，/,/g')
+ARTIST=$(echo "$ARTIST" | sed 's/[\/\\:*?"<>|]/_/g')
 
 TITLE=$(echo "$METADATA" | jq -r '.track // .title // empty')
 if [ -z "$TITLE" ]; then
     TITLE="unknown_title"
 fi
+
+# Remove artist name from title if it appears at the beginning
+TITLE=$(echo "$TITLE" | sed "s/^${ARTIST} - //g" | sed "s/^${ARTIST}//g" | sed 's/^ - //g')
+
 TITLE=$(echo "$TITLE" | sed 's/[\/\\:*?"<>|]/_/g')
 
 BASE_FILENAME="${ARTIST} - ${TITLE}"
