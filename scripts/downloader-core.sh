@@ -15,7 +15,7 @@ mkdir -p "$DOWNLOAD_BASE"
 mkdir -p "$DOWNLOAD_BASE/files"
 
 # ----------------------------------------------------------------------
-# Split a large file into ZIP parts (NO cd, NO pushd - uses absolute paths)
+# Split a large file into ZIP parts (in-place, like youtube/single.sh)
 # ----------------------------------------------------------------------
 split_large_file() {
     local file_path="$1"
@@ -25,29 +25,17 @@ split_large_file() {
     local max_size_bytes=$((max_size_mb * 1024 * 1024))
     
     if [ "$file_size" -gt "$max_size_bytes" ]; then
-        echo "File size exceeds ${max_size_mb}MB, splitting into parts"
-        
         local dir_path=$(dirname "$file_path")
         local base_name=$(basename "$file_path")
         local name_without_ext="${base_name%.*}"
-        local temp_dir="$dir_path/temp_split_$$"
         
-        mkdir -p "$temp_dir"
-        cp "$file_path" "$temp_dir/"
+        echo "File size exceeds ${max_size_mb}MB, splitting into parts"
         
-        # Run zip from the temp directory using absolute paths
-        (cd "$temp_dir" && zip -s "${max_size_mb}m" "${name_without_ext}.zip" "$base_name" > /dev/null)
-        
-        # Move the split parts back
-        for part in "$temp_dir/${name_without_ext}.zip"*; do
-            if [ -f "$part" ]; then
-                mv "$part" "$dir_path/"
-            fi
-        done
-        
-        # Clean up
-        rm -rf "$temp_dir"
-        rm -f "$file_path"
+        # Go to the file's directory and split in-place
+        cd "$dir_path"
+        zip -s "${max_size_mb}m" "${name_without_ext}.zip" "$base_name"
+        rm -f "$base_name"
+        cd - > /dev/null
         
         echo "SUCCESS: File split into multiple parts in $dir_path"
         ls -la "$dir_path/${name_without_ext}.zip"* 2>/dev/null
@@ -139,10 +127,10 @@ case "$PLATFORM" in
         fi
         ;;
     youtube)
-        echo "⚠️ YouTube download is temporarily disabled. Check back later."
+        echo "YouTube download is temporarily disabled. Check back later."
         ;;
     instagram)
-        echo "⚠️ Instagram download is temporarily disabled. Check back later."
+        echo "Instagram download is temporarily disabled. Check back later."
         ;;
     tiktok)
         ./scripts/tiktok/single.sh "$URL"
