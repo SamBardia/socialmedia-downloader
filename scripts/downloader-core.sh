@@ -7,7 +7,7 @@ if [ -f "config/common.conf" ]; then
     source "config/common.conf"
 fi
 
-DOWNLOAD_BASE="${DOWNLOAD_BASE:-downloads}"
+DOWNLOAD_BASE="${DOWNLOAD_BASE:-dl}"
 MAX_ZIP_SIZE_MB="${MAX_ZIP_SIZE_MB:-90}"
 SPLIT_LARGE_FILES="${SPLIT_LARGE_FILES:-true}"
 
