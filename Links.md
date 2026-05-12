@@ -2,7 +2,8 @@
 
 Click on any link below to start downloading directly.
 
-### 📅 2026-05-12 21:31 UTC
+### 📅 2026-05-12 21:52 UTC
+- [Telegram_12.6.5_APKPure.apk](https://github.com/BakerStreetBoys/socialmedia-downloader/raw/main/downloads/files/Telegram_12.6.5_APKPure.apk) (47.8 MB)
 - [Firefox Fast & Private Browser_150.0.3_APKPure.7z.007](https://github.com/BakerStreetBoys/socialmedia-downloader/raw/main/downloads/files/Firefox%20Fast%20%26%20Private%20Browser_150.0.3_APKPure.7z.007) (44.5 MB)
 - [Firefox Fast & Private Browser_150.0.3_APKPure.7z.006](https://github.com/BakerStreetBoys/socialmedia-downloader/raw/main/downloads/files/Firefox%20Fast%20%26%20Private%20Browser_150.0.3_APKPure.7z.006) (90.0 MB)
 - [Firefox Fast & Private Browser_150.0.3_APKPure.7z.005](https://github.com/BakerStreetBoys/socialmedia-downloader/raw/main/downloads/files/Firefox%20Fast%20%26%20Private%20Browser_150.0.3_APKPure.7z.005) (90.0 MB)
