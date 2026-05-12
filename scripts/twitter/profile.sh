@@ -1,8 +1,7 @@
 #!/bin/bash
 # ============================================
 # Twitter profile last N tweets downloader
-# Downloads all tweets (with or without media) from a profile
-# Fixed: COUNT validation + tweet text extraction
+# Fixed: Always save tweet text & metadata, even without media
 # ============================================
 
 if [ -f "config/twitter.conf" ]; then
@@ -13,9 +12,7 @@ DOWNLOAD_PATH="${DOWNLOAD_PATH:-downloads/twitter}"
 URL="$1"
 COUNT="${2:-20}"
 
-# ============================================
 # Validate COUNT is a number
-# ============================================
 if ! [[ "$COUNT" =~ ^[0-9]+$ ]]; then
     echo "WARNING: COUNT '$COUNT' is not a number, using default 20"
     COUNT=20
@@ -63,11 +60,9 @@ echo "Found $TOTAL_TWEETS tweets"
 # Function to extract tweet text properly
 extract_tweet_text() {
     local title="$1"
-    # Remove "User on X: " or "User / X" patterns
     local text=$(echo "$title" | sed -E 's/^[^:]+:[[:space:]]*//' | sed 's/ \/ X$//')
-    # If result is empty or just whitespace, try description
     if [ -z "$(echo "$text" | tr -d '[:space:]')" ]; then
-        text="$1"
+        text="$title"
     fi
     echo "$text"
 }
@@ -76,7 +71,6 @@ INDEX=1
 while read -r tweet_url; do
     [ -z "$tweet_url" ] && continue
     
-    # Extract tweet ID
     TWEET_ID=$(echo "$tweet_url" | grep -oP 'status/\K[0-9]+')
     if [ -z "$TWEET_ID" ]; then
         continue
@@ -84,7 +78,6 @@ while read -r tweet_url; do
     
     echo "Processing tweet $INDEX of $TOTAL_TWEETS: $TWEET_ID"
     
-    # Get metadata
     METADATA=$(python3 -m yt_dlp --skip-download --dump-json "$tweet_url" 2>/dev/null)
     
     # Check if tweet has media
@@ -94,7 +87,7 @@ while read -r tweet_url; do
         HAS_MEDIA=true
     fi
     
-    # Extract tweet text - FIXED
+    # Extract tweet text
     TITLE_TEXT=$(echo "$METADATA" | jq -r '.title // empty')
     DESCRIPTION_TEXT=$(echo "$METADATA" | jq -r '.description // empty')
     
@@ -122,7 +115,6 @@ while read -r tweet_url; do
     REPLY_COUNT=$(echo "$METADATA" | jq -r '.reply_count // .comment_count // empty')
     VIEW_COUNT=$(echo "$METADATA" | jq -r '.view_count // empty')
     
-    # Convert empty or null to "N/A"
     [ -z "$LIKE_COUNT" ] || [ "$LIKE_COUNT" = "null" ] && LIKE_COUNT="N/A"
     [ -z "$REPOST_COUNT" ] || [ "$REPOST_COUNT" = "null" ] && REPOST_COUNT="N/A"
     [ -z "$REPLY_COUNT" ] || [ "$REPLY_COUNT" = "null" ] && REPLY_COUNT="N/A"
@@ -133,10 +125,10 @@ while read -r tweet_url; do
     mkdir -p "$TWEET_FOLDER"
     cd "$TWEET_FOLDER" || exit 1
     
-    # Save tweet text
+    # Save tweet text (ALWAYS)
     echo "$DESCRIPTION" > "text.txt"
     
-    # Save metadata
+    # Save metadata (ALWAYS)
     {
         echo "Tweet ID: $TWEET_ID"
         echo "Author: $USERNAME"
@@ -152,8 +144,9 @@ while read -r tweet_url; do
         echo "Views: $VIEW_COUNT"
     } > "info.txt"
     
-    # Download media if present
+    # Download media if present (ONLY if has media)
     if [ "$HAS_MEDIA" = true ]; then
+        echo "  Downloading media for tweet $TWEET_ID..."
         python3 -m yt_dlp \
             --retries 10 \
             --fragment-retries 10 \
@@ -181,14 +174,13 @@ done < tweet_urls.txt
 
 cd ..
 
-# Create final ZIP archive
-if [ -d "$TEMP_DIR" ] && [ "$(ls -A "$TEMP_DIR" 2>/dev/null)" ]; then
+# Create final ZIP archive (ALWAYS, even if no media)
+if [ -d "$TEMP_DIR" ]; then
     zip -r "$FINAL_ZIP_NAME" "$TEMP_DIR"
     rm -rf "$TEMP_DIR"
     echo "SUCCESS: Profile saved as $FINAL_ZIP_NAME"
     ls -la "$FINAL_ZIP_NAME"
 else
-    echo "ERROR: No tweets were downloaded"
-    rm -rf "$TEMP_DIR"
+    echo "ERROR: No tweets were processed"
     exit 1
 fi
