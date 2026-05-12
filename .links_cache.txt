@@ -13,6 +13,7 @@ downloads/files/WhiteDNS-1.1.0-universal.apk|1778537584
 downloads/files/WhiteDNS-1.2.0-universal.apk|1778620974
 downloads/files/mhrv-rs-windows-amd64.zip|1778605005
 downloads/files/npp.8.9.5.Installer.x64.exe|1778624444
+downloads/files/tportable-x64.6.8.2.zip|1778625170
 downloads/files/tsetup-x64.6.8.2.exe|1778625161
 downloads/soundcloud/Amin Rostami - امین رستمی عشق جانم(1).mp3|1778596785
 downloads/soundcloud/Amin Rostami - امین رستمی عشق جانم.mp3|1778596681

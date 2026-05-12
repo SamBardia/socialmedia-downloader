@@ -5,6 +5,7 @@
 برای دانلود، روی هر لینک کلیک کنید.
 
 ### 📅 2026-05-13 02:02 تهران
+- [tportable-x64.6.8.2.zip](https://github.com/BakerStreetBoys/socialmedia-downloader/raw/main/downloads/files/tportable-x64.6.8.2.zip) (64.1 MB)
 - [tsetup-x64.6.8.2.exe](https://github.com/BakerStreetBoys/socialmedia-downloader/raw/main/downloads/files/tsetup-x64.6.8.2.exe) (49.2 MB)
 - [npp.8.9.5.Installer.x64.exe](https://github.com/BakerStreetBoys/socialmedia-downloader/raw/main/downloads/files/npp.8.9.5.Installer.x64.exe) (6.5 MB)
 - [BraveBrowserStandaloneSetup.7z.002](https://github.com/BakerStreetBoys/socialmedia-downloader/raw/main/downloads/files/BraveBrowserStandaloneSetup.7z.002) (52.9 MB)
