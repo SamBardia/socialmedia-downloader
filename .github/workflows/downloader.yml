@@ -7,11 +7,11 @@ on:
         description: 'Enter URLs (one per line, or separated by space/comma)'
         required: true
         type: string
-      twitter_profile_count:
-        description: 'Number of tweets for Twitter profile (max 50)'
-        required: false
-        default: '20'
-        type: string
+      # twitter_profile_count:
+      #   description: 'Number of tweets for Twitter profile (max 50)'
+      #   required: false
+      #   default: '20'
+      #   type: string
 
 jobs:
   download:
