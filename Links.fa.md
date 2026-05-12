@@ -4,7 +4,8 @@
 
 برای دانلود، روی هر لینک کلیک کنید.
 
-### 📅 2026-05-13 00:43 تهران
+### 📅 2026-05-13 00:52 تهران
+- [WhiteDNS-1.2.0-universal.apk](https://github.com/BakerStreetBoys/socialmedia-downloader/raw/main/downloads/files/WhiteDNS-1.2.0-universal.apk) (16.3 MB)
 - [VSCodeUserSetup-x64-1.119.1.7z.002](https://github.com/BakerStreetBoys/socialmedia-downloader/raw/main/downloads/files/VSCodeUserSetup-x64-1.119.1.7z.002) (59.7 MB)
 - [VSCodeUserSetup-x64-1.119.1.7z.001](https://github.com/BakerStreetBoys/socialmedia-downloader/raw/main/downloads/files/VSCodeUserSetup-x64-1.119.1.7z.001) (90.0 MB)
 - [mhrv-rs-windows-amd64.zip](https://github.com/BakerStreetBoys/socialmedia-downloader/raw/main/downloads/files/mhrv-rs-windows-amd64.zip) (7.5 MB)
