@@ -2,7 +2,8 @@
 
 Click on any link below to start downloading directly.
 
-### 📅 2026-05-12 22:20 UTC
+### 📅 2026-05-12 22:32 UTC
+- [tsetup-x64.6.8.2.exe](https://github.com/BakerStreetBoys/socialmedia-downloader/raw/main/downloads/files/tsetup-x64.6.8.2.exe) (49.2 MB)
 - [npp.8.9.5.Installer.x64.exe](https://github.com/BakerStreetBoys/socialmedia-downloader/raw/main/downloads/files/npp.8.9.5.Installer.x64.exe) (6.5 MB)
 - [BraveBrowserStandaloneSetup.7z.002](https://github.com/BakerStreetBoys/socialmedia-downloader/raw/main/downloads/files/BraveBrowserStandaloneSetup.7z.002) (52.9 MB)
 - [BraveBrowserStandaloneSetup.7z.001](https://github.com/BakerStreetBoys/socialmedia-downloader/raw/main/downloads/files/BraveBrowserStandaloneSetup.7z.001) (90.0 MB)
