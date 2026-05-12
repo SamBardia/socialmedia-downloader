@@ -134,7 +134,7 @@ downloads/
 
 ## 🤝 مشارکت در توسعه
 
-هرگونه مشارکت، ایده یا گزارش مشکل، لطفاً از طریق [صفحه Issues](https://github.com/BakerStreetBoys/socialmedia-downloader/issues) مطرح کنید.
+هرگونه مشارکت، ایده یا گزارش مشکل، لطفاً از طریق [صفحه Issues](./issues) مطرح کنید.
 
 ## ⚠️ سلب مسئولیت قانونی
 
