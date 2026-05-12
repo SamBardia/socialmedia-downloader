@@ -7,6 +7,10 @@ downloads/files/Firefox Fast & Private Browser_150.0.3_APKPure.7z.006|1778621483
 downloads/files/Firefox Fast & Private Browser_150.0.3_APKPure.7z.007|1778621483
 downloads/files/GitHub_1.257.0_APKPure.xapk|1778623203
 downloads/files/IMDb: Movies & TV Shows_9.2.9.109290300_APKPure.apk|1778623062
+downloads/files/Samsung Health_6.32.0.001_APKPure.7z.001|1778623665
+downloads/files/Samsung Health_6.32.0.001_APKPure.7z.002|1778623665
+downloads/files/Samsung Health_6.32.0.001_APKPure.7z.003|1778623665
+downloads/files/Samsung Health_6.32.0.001_APKPure.7z.004|1778623665
 downloads/files/Telegram_12.6.5_APKPure.apk|1778622759
 downloads/files/VSCodeUserSetup-x64-1.119.1.7z.001|1778620382
 downloads/files/VSCodeUserSetup-x64-1.119.1.7z.002|1778620382
