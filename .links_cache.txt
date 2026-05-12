@@ -1,4 +1,6 @@
 downloads/files/WhiteDNS-1.1.0-universal.apk|1778537584
+downloads/soundcloud/Amin Rostami - امین رستمی عشق جانم(1).mp3|1778596785
+downloads/soundcloud/Amin Rostami - امین رستمی عشق جانم.mp3|1778596681
 downloads/soundcloud/Daddys-back.zip|1778542368
 downloads/soundcloud/Fadaei - Yadegari.mp3|1778530703
 downloads/soundcloud/Fil.zip|1778542849
