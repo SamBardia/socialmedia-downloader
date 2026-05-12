@@ -136,7 +136,7 @@ Yes. Instagram requires `INSTAGRAM_COOKIES` to access profile content, stories, 
 
 ## 🤝 Contributing
 
-Ideas, issues, and pull requests are welcome! Please use the [Issues page](https://github.com/BakerStreetBoys/socialmedia-downloader/issues) for discussions.
+Ideas, issues, and pull requests are welcome! Please use the [Issues page](./issues) for discussions.
 
 ## ⚠️ Legal Disclaimer
 
