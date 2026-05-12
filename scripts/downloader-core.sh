@@ -108,7 +108,7 @@ case "$PLATFORM" in
         if [[ "$URL" == *"/status/"* ]]; then
             ./scripts/twitter/single.sh "$URL"
         else
-            ./scripts/twitter/profile.sh "$URL" "$TWITTER_PROFILE_COUNT"
+            echo "⚠️ Twitter profile and thread download is temporarily disabled. Use single tweet links (with /status/ in URL) instead."
         fi
         ;;
     youtube)
