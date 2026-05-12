@@ -1,3 +1,5 @@
+downloads/files/VSCodeUserSetup-x64-1.119.1.7z.001|1778620382
+downloads/files/VSCodeUserSetup-x64-1.119.1.7z.002|1778620382
 downloads/files/WhiteDNS-1.1.0-universal.apk|1778537584
 downloads/files/mhrv-rs-windows-amd64.zip|1778605005
 downloads/soundcloud/Amin Rostami - امین رستمی عشق جانم(1).mp3|1778596785
