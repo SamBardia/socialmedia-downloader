@@ -4,7 +4,9 @@
 
 برای دانلود، روی هر لینک کلیک کنید.
 
-### 📅 2026-05-13 01:41 تهران
+### 📅 2026-05-13 01:45 تهران
+- [BraveBrowserStandaloneSetup.7z.002](https://github.com/BakerStreetBoys/socialmedia-downloader/raw/main/downloads/files/BraveBrowserStandaloneSetup.7z.002) (52.9 MB)
+- [BraveBrowserStandaloneSetup.7z.001](https://github.com/BakerStreetBoys/socialmedia-downloader/raw/main/downloads/files/BraveBrowserStandaloneSetup.7z.001) (90.0 MB)
 - [Brave Private Web Browser, VPN_1.90.121_APKPure.7z.003](https://github.com/BakerStreetBoys/socialmedia-downloader/raw/main/downloads/files/Brave%20Private%20Web%20Browser%2C%20VPN_1.90.121_APKPure.7z.003) (69.5 MB)
 - [Brave Private Web Browser, VPN_1.90.121_APKPure.7z.002](https://github.com/BakerStreetBoys/socialmedia-downloader/raw/main/downloads/files/Brave%20Private%20Web%20Browser%2C%20VPN_1.90.121_APKPure.7z.002) (90.0 MB)
 - [Brave Private Web Browser, VPN_1.90.121_APKPure.7z.001](https://github.com/BakerStreetBoys/socialmedia-downloader/raw/main/downloads/files/Brave%20Private%20Web%20Browser%2C%20VPN_1.90.121_APKPure.7z.001) (90.0 MB)
